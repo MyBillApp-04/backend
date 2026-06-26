@@ -1,0 +1,60 @@
+# Java / Spring Boot build output
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Maven wrapper should stay tracked
+!.mvn/wrapper/maven-wrapper.jar
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+key.properties
+
+# Sensitive service credentials
+src/main/resources/mybill-service.json
+src/main/resources/credentials.json
+src/main/resources/firebase.json
+src/main/resources/*service-account*.json
+src/main/resources/*credentials*.json
+
+# Runtime uploads and generated user files
+uploads/
+*.pdf
+*.rtf
+
+# Logs and temporary files
+logs/
+*.log
+*.tmp
+*.pid
+*.hprof
+
+# IDE/editor files
+.idea/
+.vscode/
+*.iws
+*.iml
+*.ipr
+.settings/
+.project
+.classpath
+.factorypath
+.history/
+out/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Docker/local override files
+docker-compose.override.yml
