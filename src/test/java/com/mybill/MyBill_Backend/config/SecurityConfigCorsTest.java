@@ -30,6 +30,30 @@ class SecurityConfigCorsTest {
                 .isEqualTo("http://[::1]:54231");
     }
 
+    @Test
+    void productionConfigurationAllowsFirebaseAndLocalFlutterWebOrigins() {
+        SecurityConfig config = new SecurityConfig(null, null,
+                new MockEnvironment().withProperty("spring.profiles.active", "prod"));
+        ReflectionTestUtils.setField(config, "allowedOrigins",
+                "https://mybill-app-04.firebaseapp.com,"
+                        + "https://mybill-app-04.web.app");
+
+        CorsConfiguration cors = config.corsConfigurationSource()
+                .getCorsConfiguration(preflightRequest("http://localhost:53642"));
+
+        assertThat(cors).isNotNull();
+        assertThat(cors.checkOrigin("https://mybill-app-04.firebaseapp.com"))
+                .isEqualTo("https://mybill-app-04.firebaseapp.com");
+        assertThat(cors.checkOrigin("https://mybill-app-04.web.app"))
+                .isEqualTo("https://mybill-app-04.web.app");
+        assertThat(cors.checkOrigin("http://localhost:53642"))
+                .isEqualTo("http://localhost:53642");
+        assertThat(cors.checkOrigin("http://127.0.0.1:61234"))
+                .isEqualTo("http://127.0.0.1:61234");
+        assertThat(cors.checkOrigin("http://[::1]:54231"))
+                .isEqualTo("http://[::1]:54231");
+    }
+
     private HttpServletRequest preflightRequest(String origin) {
         MockHttpServletRequest request = new MockHttpServletRequest("OPTIONS", "/api/auth/firebase-login");
         request.addHeader("Origin", origin);

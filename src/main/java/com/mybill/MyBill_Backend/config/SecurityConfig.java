@@ -100,9 +100,10 @@ public class SecurityConfig {
                     .map(this::normalizeOriginPattern)
                     .filter(origin -> !origin.isBlank())
                     .toList());
-            if (!isProdProfile()) {
-                addLocalDevPatterns(origins);
-            }
+            // Flutter Web debug builds use the cloud backend from random local
+            // ports. Keep loopback origins available even when Render supplies
+            // an explicit ALLOWED_ORIGINS value.
+            addLocalDevPatterns(origins);
             if (origins.stream().anyMatch(origin -> origin.contains("*"))) {
                 config.setAllowedOriginPatterns(origins);
             } else {
@@ -128,11 +129,6 @@ public class SecurityConfig {
     private boolean isDevProfile() {
         return Arrays.stream(environment.getActiveProfiles())
                 .anyMatch(profile -> profile.equalsIgnoreCase("dev"));
-    }
-
-    private boolean isProdProfile() {
-        return Arrays.stream(environment.getActiveProfiles())
-                .anyMatch(profile -> profile.equalsIgnoreCase("prod"));
     }
 
     private String normalizeOriginPattern(String origin) {
