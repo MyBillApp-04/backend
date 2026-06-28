@@ -62,7 +62,7 @@ public class AppReleaseService {
                         "versionCode must be greater than the currently published release");
             }
             active.setActive(false);
-            repository.save(active);
+            repository.saveAndFlush(active);
         });
 
         return repository.save(AppRelease.builder()
