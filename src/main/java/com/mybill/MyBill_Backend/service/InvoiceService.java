@@ -23,6 +23,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.context.ApplicationEventPublisher;
 import com.mybill.MyBill_Backend.event.InvoiceCreatedEvent;
+import com.mybill.MyBill_Backend.event.InvoiceUpdatedEvent;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -207,7 +208,9 @@ public class InvoiceService {
 
         invoice.setUpdatedAt(LocalDateTime.now());
 
-        return invoiceRepository.save(invoice);
+        Invoice saved = invoiceRepository.save(invoice);
+        eventPublisher.publishEvent(new InvoiceUpdatedEvent(this, saved));
+        return saved;
     }
 
     @Transactional

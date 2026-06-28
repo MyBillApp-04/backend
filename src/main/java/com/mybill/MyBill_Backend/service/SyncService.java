@@ -13,6 +13,7 @@ import org.springframework.data.domain.*;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +42,7 @@ public class SyncService {
     private final SyncDeviceStateRepository syncDeviceStateRepository;
     private final PlatformTransactionManager transactionManager;
     private final InvoiceNumberService invoiceNumberService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @CacheEvict(value = "dashboardStats", allEntries = true)
@@ -142,9 +144,17 @@ public class SyncService {
                     if (applied) workRepository.saveAndFlush(w);
                 }
                 case "invoice" -> {
+                    boolean isNew = invoiceRepository.findByIdAndUserId(
+                            UUID.fromString(change.getEntityId()), userId).isEmpty();
                     Invoice i = buildInvoice(change, managedUser, userId, deviceId, serverTime, conflictPolicy);
                     applied = i != null;
-                    if (applied) invoiceRepository.saveAndFlush(i);
+                    if (applied) {
+                        Invoice saved = invoiceRepository.saveAndFlush(i);
+                        if (isNew && !"delete".equalsIgnoreCase(change.getOperation())) {
+                            eventPublisher.publishEvent(
+                                    new com.mybill.MyBill_Backend.event.InvoiceCreatedEvent(this, saved));
+                        }
+                    }
                 }
                 case "invoice_item" -> {
                     InvoiceItem ii = buildInvoiceItem(change, managedUser, userId, deviceId, serverTime);
