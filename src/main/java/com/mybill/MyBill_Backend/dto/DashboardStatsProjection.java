@@ -13,4 +13,6 @@ public interface DashboardStatsProjection {
     Long getPendingInvoices();
 
     String getTopClient();
+
+    String getTopClientId();
 }
