@@ -26,6 +26,7 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/mybill
       DB_USERNAME: mybill
       DB_PASSWORD: mybill_password
+      APP_TIME_ZONE: Asia/Kolkata
       PORT: 8080
     ports:
       - "8080:8080"

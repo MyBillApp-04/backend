@@ -6,6 +6,9 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 
+ENV TZ=Asia/Kolkata
+ENV APP_TIME_ZONE=Asia/Kolkata
+
 RUN groupadd -r spring && useradd -r -g spring spring \
     && mkdir -p /app/uploads \
     && chown -R spring:spring /app
