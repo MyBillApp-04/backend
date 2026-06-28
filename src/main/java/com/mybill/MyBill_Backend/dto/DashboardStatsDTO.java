@@ -19,6 +19,7 @@ public class DashboardStatsDTO {
     private double totalPending;
     private long pendingInvoices;
     private String topClient;
+    private String topClientId;
 
     private List<ClientWorkDTO> recentActivity;
 }

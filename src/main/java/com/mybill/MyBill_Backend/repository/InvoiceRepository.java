@@ -246,4 +246,6 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
             LocalDateTime updatedAt,
             Pageable pageable
     );
+
+    List<Invoice> findByIsDeletedFalseAndPaymentStatusIn(List<PaymentStatus> statuses);
 }

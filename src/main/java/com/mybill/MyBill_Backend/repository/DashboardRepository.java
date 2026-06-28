@@ -61,7 +61,18 @@ public interface DashboardRepository extends JpaRepository<User, Long> {
                     GROUP BY c.id, c.name
                     ORDER BY SUM(inv.total_amount) DESC
                     LIMIT 1
-                ) AS topClient
+                ) AS topClient,
+
+                (
+                    SELECT CAST(c.id AS VARCHAR)
+                    FROM invoice inv
+                    JOIN clients c ON inv.client_id = c.id
+                    WHERE inv.user_id = :userId
+                    AND COALESCE(inv.is_deleted, false) = false
+                    GROUP BY c.id, c.name
+                    ORDER BY SUM(inv.total_amount) DESC
+                    LIMIT 1
+                ) AS topClientId
             """, nativeQuery = true)
     DashboardStatsProjection getDashboardStats(
             @Param("userId") Long userId,

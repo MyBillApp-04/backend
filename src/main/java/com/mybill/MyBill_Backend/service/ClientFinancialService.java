@@ -15,6 +15,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
+import com.mybill.MyBill_Backend.event.PaymentRecordedEvent;
+import com.mybill.MyBill_Backend.event.AdvanceBalanceAvailableEvent;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -31,6 +34,7 @@ public class ClientFinancialService {
     private final ClientRepository clientRepository;
     private final PaymentRepository paymentRepository;
     private final SecurityUtils securityUtils;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public double getAdvanceBalance(UUID clientId, Long userId) {
@@ -200,6 +204,8 @@ public class ClientFinancialService {
             savedPayment.setAppliedToInvoice(true);
             remainingReceipt = roundMoney(remainingReceipt - applied);
             appliedToInvoices = roundMoney(appliedToInvoices + applied);
+
+            eventPublisher.publishEvent(new PaymentRecordedEvent(this, savedPayment, invoice, applied, newPending));
         }
 
         double addedToAdvance = 0.0;
@@ -213,9 +219,11 @@ public class ClientFinancialService {
                     LedgerDirection.CREDIT,
                     remainingReceipt,
                     when,
-                    request.getNotes() != null ? request.getNotes() : "Advance received",
+                    request.getNotes() != null ? request.getNotes() : "Money received",
                     request.getDeviceId()
             );
+
+            eventPublisher.publishEvent(new AdvanceBalanceAvailableEvent(this, client, user, remainingReceipt));
         }
 
         paymentRepository.save(savedPayment);

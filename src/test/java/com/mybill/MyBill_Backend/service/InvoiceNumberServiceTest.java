@@ -11,7 +11,6 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class InvoiceNumberServiceTest {
@@ -37,7 +36,7 @@ class InvoiceNumberServiceTest {
 
         when(settingsRepository.findByUserId(7L)).thenReturn(Optional.of(settings));
         when(entityManager.createNativeQuery(anyString())).thenReturn(query);
-        when(query.setParameter(eq("financialYear"), eq("2026-2027"))).thenReturn(query);
+        when(query.setParameter(anyString(), any())).thenReturn(query);
         when(query.getSingleResult()).thenReturn(1, 2, 3);
 
         InvoiceNumberService service = new InvoiceNumberService(settingsRepository, entityManager);

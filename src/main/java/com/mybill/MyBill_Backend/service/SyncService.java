@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +43,7 @@ public class SyncService {
     private final InvoiceNumberService invoiceNumberService;
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @CacheEvict(value = "dashboardStats", allEntries = true)
     public SyncResponse sync(SyncRequest request) {
         Timer.Sample sample = Timer.start(meterRegistry);
         String outcome = "success";

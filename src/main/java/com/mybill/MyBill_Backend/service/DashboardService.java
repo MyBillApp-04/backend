@@ -64,6 +64,7 @@ public class DashboardService {
                 .totalPending(valueOrZero(stats.getTotalPending()))
                 .pendingInvoices(valueOrZero(stats.getPendingInvoices()))
                 .topClient(stats.getTopClient() != null ? stats.getTopClient() : "N/A")
+                .topClientId(stats.getTopClientId())
                 .recentActivity(recentActivity)
                 .build();
     }

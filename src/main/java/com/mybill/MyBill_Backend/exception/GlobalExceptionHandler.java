@@ -2,8 +2,6 @@ package com.mybill.MyBill_Backend.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
-import com.stripe.exception.SignatureVerificationException;
-import com.stripe.exception.StripeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -215,33 +213,6 @@ public class GlobalExceptionHandler {
         );
     }
 
-    @ExceptionHandler(SignatureVerificationException.class)
-    public ResponseEntity<Map<String, Object>> handleStripeSignature(
-            SignatureVerificationException ex,
-            HttpServletRequest request
-    ) {
-        log.warn("Invalid Stripe webhook signature: {}", ex.getMessage());
-
-        return buildErrorResponse(
-                HttpStatus.BAD_REQUEST,
-                "Invalid webhook signature",
-                request.getRequestURI()
-        );
-    }
-
-    @ExceptionHandler(StripeException.class)
-    public ResponseEntity<Map<String, Object>> handleStripeException(
-            StripeException ex,
-            HttpServletRequest request
-    ) {
-        log.warn("Stripe API error: {}", ex.getMessage());
-
-        return buildErrorResponse(
-                HttpStatus.BAD_GATEWAY,
-                "Payment provider request failed",
-                request.getRequestURI()
-        );
-    }
 
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<Map<String, Object>> handleDatabaseException(

@@ -21,6 +21,8 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
+import com.mybill.MyBill_Backend.event.InvoiceCreatedEvent;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -41,6 +43,7 @@ public class InvoiceService {
     private final UserRepository userRepository;
     private final InvoiceNumberService invoiceNumberService;
     private final ClientFinancialService clientFinancialService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     @CacheEvict(value = "dashboardStats", allEntries = true)
@@ -153,6 +156,8 @@ public class InvoiceService {
         if (advanceApplied > 0) {
             clientFinancialService.applyAdvanceToInvoice(savedInvoice, advanceApplied, now);
         }
+
+        eventPublisher.publishEvent(new InvoiceCreatedEvent(this, savedInvoice));
 
         return savedInvoice;
     }

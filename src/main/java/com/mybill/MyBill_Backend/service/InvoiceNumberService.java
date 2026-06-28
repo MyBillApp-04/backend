@@ -26,7 +26,7 @@ public class InvoiceNumberService {
     public InvoiceNumberResult generateNextInvoiceNumber(Long userId, LocalDate invoiceDate) {
         LocalDate effectiveDate = invoiceDate != null ? invoiceDate : LocalDate.now(INDIA);
         FinancialYear financialYear = financialYearFor(effectiveDate);
-        int sequence = reserveSequence(financialYear.label());
+        int sequence = reserveSequence(userId, financialYear.label());
         if (sequence > MAX_SEQUENCE) {
             throw new IllegalStateException("Invoice sequence limit reached for " + financialYear.label());
         }
@@ -47,15 +47,16 @@ public class InvoiceNumberService {
         );
     }
 
-    /** PostgreSQL UPSERT serializes allocations for one financial year. */
-    private int reserveSequence(String financialYear) {
+    /** PostgreSQL UPSERT serializes allocations for one financial year per user. */
+    private int reserveSequence(Long userId, String financialYear) {
         Object value = entityManager.createNativeQuery("""
-                INSERT INTO public.invoice_financial_year_sequence (financial_year, last_sequence)
-                VALUES (:financialYear, 1)
-                ON CONFLICT (financial_year) DO UPDATE
+                INSERT INTO public.invoice_financial_year_sequence (user_id, financial_year, last_sequence)
+                VALUES (:userId, :financialYear, 1)
+                ON CONFLICT (user_id, financial_year) DO UPDATE
                     SET last_sequence = public.invoice_financial_year_sequence.last_sequence + 1
                 RETURNING last_sequence
                 """)
+                .setParameter("userId", userId)
                 .setParameter("financialYear", financialYear)
                 .getSingleResult();
         return ((Number) value).intValue();

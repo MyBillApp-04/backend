@@ -23,7 +23,6 @@
         <lombok.version>1.18.34</lombok.version>
         <jjwt.version>0.12.6</jjwt.version>
         <firebase-admin.version>9.2.0</firebase-admin.version>
-        <stripe-java.version>33.0.0</stripe-java.version>
         <axon.version>4.9.0</axon.version>
         <itext.version>7.2.5</itext.version>
         <spring-dotenv.version>4.0.0</spring-dotenv.version>
@@ -123,11 +122,7 @@
             <version>${firebase-admin.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>com.stripe</groupId>
-            <artifactId>stripe-java</artifactId>
-            <version>${stripe-java.version}</version>
-        </dependency>
+
 
         <dependency>
             <groupId>org.axonframework</groupId>
