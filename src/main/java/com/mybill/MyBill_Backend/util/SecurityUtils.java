@@ -23,7 +23,16 @@ public class SecurityUtils {
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
     }
 
+    /**
+     * Returns the current user's ID, preferring the cached value stored in
+     * {@link Authentication#getDetails()} by the JWT filter to avoid an
+     * unnecessary database round-trip on every authenticated request.
+     */
     public Long getCurrentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getDetails() instanceof Long userId) {
+            return userId;
+        }
         return getCurrentUser().getId();
     }
 }

@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.*;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -24,7 +25,7 @@ public class ClientController {
 
     @PostMapping
     public ResponseEntity<ClientResponse> createClient(
-            @RequestBody ClientRequest request
+            @Valid @RequestBody ClientRequest request
     ) {
         Client client = toEntity(request);
 
@@ -53,7 +54,7 @@ public class ClientController {
     @PutMapping("/{id}")
     public ResponseEntity<ClientResponse> updateClient(
             @PathVariable UUID id,
-            @RequestBody ClientRequest request
+            @Valid @RequestBody ClientRequest request
     ) {
         Client patch = toEntity(request);
 
