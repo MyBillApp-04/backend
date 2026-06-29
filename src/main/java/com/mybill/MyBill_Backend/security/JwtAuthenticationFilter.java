@@ -39,12 +39,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             log.debug("HTTP Method: {}", request.getMethod());
         }
 
-//        if (path.startsWith("/auth/")) {
-//            if (log.isDebugEnabled()) log.debug("Action: Bypassing auth route.");
-//            filterChain.doFilter(request, response);
-//            return;
-//        }
-
         if (path.startsWith("/api/auth/") || path.startsWith("/auth/")) {
             filterChain.doFilter(request, response);
             return;

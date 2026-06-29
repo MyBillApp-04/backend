@@ -53,7 +53,7 @@ public class InvoiceController {
         Invoice updatedInvoice = invoiceService.updatePayment(
                 invoiceId,
                 request.getPaidAmount(),
-                request.getPaymentMode() != null ? request.getPaymentMode() : null,
+                request.getPaymentMode(),
                 request.getPaymentDate()
         );
 
