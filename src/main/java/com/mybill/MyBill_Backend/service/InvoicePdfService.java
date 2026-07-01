@@ -34,6 +34,9 @@ import com.itextpdf.layout.element.Cell;
 import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.element.Link;
+import com.itextpdf.kernel.pdf.action.PdfAction;
+import com.itextpdf.kernel.pdf.PdfAnnotationBorder;
 import com.itextpdf.layout.properties.HorizontalAlignment;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
@@ -164,6 +167,9 @@ public class InvoicePdfService {
                             .sum();
             double grandTotal = invoice.getTotalAmount() != null ? invoice.getTotalAmount() : subtotal;
             double balanceAdjustment = grandTotal - subtotal;
+            double netPayable = (invoice.getNetPayable() != null && invoice.getNetPayable() > 0)
+                    ? invoice.getNetPayable()
+                    : grandTotal;
 
             Table header = new Table(UnitValue.createPercentArray(new float[]{58, 42}))
                     .useAllAvailableWidth()
@@ -299,9 +305,18 @@ public class InvoicePdfService {
 
             byte[] qrBytes = loadImage(profile.getQrImagePath(), 256, 256, true);
             boolean hasQrCode = qrBytes != null || notEmpty(finalUpiId);
+            boolean hasUpi = notEmpty(finalUpiId);
 
-            Table footer = new Table(UnitValue.createPercentArray(
-                    hasQrCode ? new float[]{52, 20, 28} : new float[]{68, 32}))
+            float[] columnWidths;
+            if (hasQrCode && hasUpi) {
+                columnWidths = new float[]{42, 16, 18, 24};
+            } else if (hasQrCode) {
+                columnWidths = new float[]{52, 20, 28};
+            } else {
+                columnWidths = new float[]{68, 32};
+            }
+
+            Table footer = new Table(UnitValue.createPercentArray(columnWidths))
                     .useAllAvailableWidth();
 
             Cell bankCell = new Cell()
@@ -345,6 +360,31 @@ public class InvoicePdfService {
 
             footer.addCell(bankCell);
 
+            if (hasUpi) {
+                Cell payCell = new Cell()
+                        .setBorder(new SolidBorder(line, 0.7f))
+                        .setPadding(10)
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setVerticalAlignment(VerticalAlignment.MIDDLE);
+
+                Paragraph payBtn = new Paragraph()
+                        .setBackgroundColor(accent)
+                        .setPadding(6)
+                        .setMarginLeft(4f)
+                        .setMarginRight(4f)
+                        .setTextAlignment(TextAlignment.CENTER);
+
+                Link link = new Link("Pay Now", PdfAction.createURI(upiPaymentPayload(profile.getBusinessName(), finalUpiId, netPayable)));
+                link.setFont(bold)
+                        .setFontSize(9.5f)
+                        .setFontColor(ColorConstants.WHITE);
+                link.getLinkAnnotation().setBorder(new PdfAnnotationBorder(0, 0, 0));
+
+                payBtn.add(link);
+                payCell.add(payBtn);
+                footer.addCell(payCell);
+            }
+
             if (hasQrCode) {
                 Cell qrCell = new Cell()
                         .setBorder(new SolidBorder(line, 0.7f))
@@ -358,7 +398,7 @@ public class InvoicePdfService {
                             .setMaxHeight(72)
                             .setHorizontalAlignment(HorizontalAlignment.CENTER));
                 } else {
-                    addGeneratedUpiQr(qrCell, profile.getBusinessName(), finalUpiId, pdf);
+                    addGeneratedUpiQr(qrCell, profile.getBusinessName(), finalUpiId, netPayable, pdf);
                 }
 
                 if (notEmpty(finalUpiId)) {
@@ -555,9 +595,9 @@ public class InvoicePdfService {
         return value != null && !value.trim().isEmpty();
     }
 
-    private void addGeneratedUpiQr(Cell qrCell, String businessName, String upiId, PdfDocument pdf) {
+    private void addGeneratedUpiQr(Cell qrCell, String businessName, String upiId, double amount, PdfDocument pdf) {
         try {
-            BarcodeQRCode barcodeQRCode = new BarcodeQRCode(upiPaymentPayload(businessName, upiId));
+            BarcodeQRCode barcodeQRCode = new BarcodeQRCode(upiPaymentPayload(businessName, upiId, amount));
             PdfFormXObject qrObject = barcodeQRCode.createFormXObject(ColorConstants.BLACK, pdf);
 
             qrCell.add(new Image(qrObject)
@@ -572,7 +612,7 @@ public class InvoicePdfService {
         }
     }
 
-    private String upiPaymentPayload(String businessName, String upiId) {
+    private String upiPaymentPayload(String businessName, String upiId, double amount) {
         StringBuilder payload = new StringBuilder("upi://pay?pa=")
                 .append(urlEncode(upiId));
 
@@ -580,6 +620,7 @@ public class InvoicePdfService {
             payload.append("&pn=").append(urlEncode(businessName));
         }
 
+        payload.append("&am=").append(formatAmount(amount));
         payload.append("&cu=INR");
         return payload.toString();
     }
