@@ -80,7 +80,8 @@ public class ReportingService {
 
         Map<String, Object> analytics = new LinkedHashMap<>();
         analytics.put("year", targetYear);
-        analytics.put("revenue", singleRow("""
+
+        Map<String, Object> revMetrics = singleRow("""
                 SELECT
                     COALESCE(SUM(total_amount), 0) AS total_revenue,
                     COALESCE(SUM(paid_amount), 0) AS paid_revenue,
@@ -90,7 +91,35 @@ public class ReportingService {
                 WHERE user_id = :userId
                   AND COALESCE(is_deleted, false) = false
                   AND EXTRACT(YEAR FROM created_date) = :year
-                """, userId, targetYear, "totalRevenue", "paidRevenue", "outstandingRevenue", "averageInvoiceValue"));
+                """, userId, targetYear, "totalRevenue", "paidRevenue", "outstandingRevenue", "averageInvoiceValue");
+
+        Object totalExpenseVal = entityManager.createNativeQuery("""
+                SELECT COALESCE(SUM(amount), 0.0)
+                FROM expenses
+                WHERE user_id = :userId
+                  AND COALESCE(is_deleted, false) = false
+                  AND EXTRACT(YEAR FROM expense_date) = :year
+                """)
+                .setParameter("userId", userId)
+                .setParameter("year", targetYear)
+                .getSingleResult();
+
+        double totalRevenue = ((Number) revMetrics.get("totalRevenue")).doubleValue();
+        double paidRevenue = ((Number) revMetrics.get("paidRevenue")).doubleValue();
+        double expenses = totalExpenseVal != null ? ((Number) totalExpenseVal).doubleValue() : 0.0;
+        double netProfit = paidRevenue - expenses;
+        double profitMargin = paidRevenue > 0 ? (netProfit / paidRevenue) * 100.0 : 0.0;
+
+        Map<String, Object> pAndL = new LinkedHashMap<>();
+        pAndL.put("totalRevenue", totalRevenue);
+        pAndL.put("paidRevenue", paidRevenue);
+        pAndL.put("outstandingRevenue", revMetrics.get("outstandingRevenue"));
+        pAndL.put("averageInvoiceValue", revMetrics.get("averageInvoiceValue"));
+        pAndL.put("totalExpenses", expenses);
+        pAndL.put("netProfit", netProfit);
+        pAndL.put("profitMargin", profitMargin);
+
+        analytics.put("revenue", pAndL);
         analytics.put("paymentStatus", paymentStatusRows(userId, targetYear));
         analytics.put("topClients", topClientRows(userId, targetYear));
         analytics.put("revenueTrends", trendRows(userId, targetYear));
@@ -116,7 +145,7 @@ public class ReportingService {
     }
 
     private List<Map<String, Object>> trendRows(Long userId, int year) {
-        List<Object[]> rows = entityManager.createNativeQuery("""
+        List<Object[]> revenueRows = entityManager.createNativeQuery("""
                 SELECT
                     EXTRACT(MONTH FROM created_date) AS month,
                     COALESCE(SUM(total_amount), 0) AS total_revenue,
@@ -133,14 +162,57 @@ public class ReportingService {
                 .setParameter("year", year)
                 .getResultList();
 
-        return rows.stream().map(row -> {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("month", row[0]);
-            m.put("totalRevenue", row[1]);
-            m.put("paidRevenue", row[2]);
-            m.put("invoiceCount", row[3]);
-            return m;
-        }).toList();
+        List<Object[]> expenseRows = entityManager.createNativeQuery("""
+                SELECT
+                    EXTRACT(MONTH FROM expense_date) AS month,
+                    COALESCE(SUM(amount), 0) AS total_expense
+                FROM expenses
+                WHERE user_id = :userId
+                  AND COALESCE(is_deleted, false) = false
+                  AND EXTRACT(YEAR FROM expense_date) = :year
+                GROUP BY EXTRACT(MONTH FROM expense_date)
+                ORDER BY month
+                """)
+                .setParameter("userId", userId)
+                .setParameter("year", year)
+                .getResultList();
+
+        Map<Integer, Double> monthlyExpenses = new LinkedHashMap<>();
+        for (Object[] r : expenseRows) {
+            int month = ((Number) r[0]).intValue();
+            double totalExpense = ((Number) r[1]).doubleValue();
+            monthlyExpenses.put(month, totalExpense);
+        }
+
+        Map<Integer, Map<String, Object>> monthlyData = new LinkedHashMap<>();
+        for (int m = 1; m <= 12; m++) {
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("month", m);
+            data.put("totalRevenue", 0.0);
+            data.put("paidRevenue", 0.0);
+            data.put("totalExpense", 0.0);
+            data.put("invoiceCount", 0);
+            monthlyData.put(m, data);
+        }
+
+        for (Object[] r : revenueRows) {
+            int month = ((Number) r[0]).intValue();
+            Map<String, Object> data = monthlyData.get(month);
+            if (data != null) {
+                data.put("totalRevenue", ((Number) r[1]).doubleValue());
+                data.put("paidRevenue", ((Number) r[2]).doubleValue());
+                data.put("invoiceCount", ((Number) r[3]).intValue());
+            }
+        }
+
+        for (Map.Entry<Integer, Double> entry : monthlyExpenses.entrySet()) {
+            Map<String, Object> data = monthlyData.get(entry.getKey());
+            if (data != null) {
+                data.put("totalExpense", entry.getValue());
+            }
+        }
+
+        return List.copyOf(monthlyData.values());
     }
 
     private List<Map<String, Object>> paymentStatusRows(Long userId, int year) {

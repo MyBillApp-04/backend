@@ -47,6 +47,30 @@ public class InvoiceSettings {
     @Column(name = "upi_id", length = 100)
     private String upiId;
 
+    @Column(name = "template_style", length = 50)
+    @Builder.Default
+    private String templateStyle = "CLASSIC";
+
+    @Column(name = "theme_color", length = 20)
+    @Builder.Default
+    private String themeColor = "#225378";
+
+    @Column(name = "font_family", length = 50)
+    @Builder.Default
+    private String fontFamily = "HELVETICA";
+
+    @Column(name = "show_logo")
+    @Builder.Default
+    private Boolean showLogo = true;
+
+    @Column(name = "tax_id_label", length = 50)
+    @Builder.Default
+    private String taxIdLabel = "";
+
+    @Column(name = "tax_id_value", length = 100)
+    @Builder.Default
+    private String taxIdValue = "";
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

@@ -34,6 +34,9 @@ import com.itextpdf.layout.element.Cell;
 import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.element.Link;
+import com.itextpdf.kernel.pdf.action.PdfAction;
+import com.itextpdf.kernel.pdf.PdfAnnotationBorder;
 import com.itextpdf.layout.properties.HorizontalAlignment;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
@@ -105,10 +108,16 @@ public class InvoicePdfService {
         String customTerms = null;
         String customPaymentNote = null;
         String customUpiId = null;
+        String templateStyle = "CLASSIC";
+        String themeColor = "#225378";
+        String fontFamily = "HELVETICA";
+        boolean showLogo = true;
+        String taxIdLabel = "";
+        String taxIdValue = "";
 
         try {
             List<Object[]> settingsList = entityManager.createNativeQuery(
-                            "SELECT terms_and_conditions, payment_note, upi_id FROM invoice_settings WHERE user_id = :userId")
+                            "SELECT terms_and_conditions, payment_note, upi_id, template_style, theme_color, font_family, show_logo, tax_id_label, tax_id_value FROM invoice_settings WHERE user_id = :userId")
                     .setParameter("userId", userId)
                     .getResultList();
 
@@ -117,6 +126,12 @@ public class InvoicePdfService {
                 if (row[0] != null) customTerms = row[0].toString();
                 if (row[1] != null) customPaymentNote = row[1].toString();
                 if (row[2] != null) customUpiId = row[2].toString();
+                if (row[3] != null) templateStyle = row[3].toString();
+                if (row[4] != null) themeColor = row[4].toString();
+                if (row[5] != null) fontFamily = row[5].toString();
+                if (row[6] != null) showLogo = (Boolean) row[6];
+                if (row[7] != null) taxIdLabel = row[7].toString();
+                if (row[8] != null) taxIdValue = row[8].toString();
             }
         } catch (Exception ignored) {}
 
@@ -133,16 +148,33 @@ public class InvoicePdfService {
             Document document = new Document(pdf, PageSize.A4);
             document.setMargins(36, 40, 50, 40);
 
-            // Convert the existing, packaged MyBill logo once and reuse the
-            // compact PDF image data on every invoice page.
             pdf.addEventHandler(PdfDocumentEvent.END_PAGE,
-                    new PageNumberEventHandler(loadFooterLogo()));
+                    new PageNumberEventHandler(showLogo ? loadFooterLogo() : null));
 
-            PdfFont bold = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
-            PdfFont regular = PdfFontFactory.createFont(StandardFonts.HELVETICA);
+            String fontName = StandardFonts.HELVETICA;
+            String boldFontName = StandardFonts.HELVETICA_BOLD;
+            if ("COURIER".equalsIgnoreCase(fontFamily)) {
+                fontName = StandardFonts.COURIER;
+                boldFontName = StandardFonts.COURIER_BOLD;
+            } else if ("TIMES".equalsIgnoreCase(fontFamily)) {
+                fontName = StandardFonts.TIMES_ROMAN;
+                boldFontName = StandardFonts.TIMES_BOLD;
+            }
+
+            PdfFont bold = PdfFontFactory.createFont(boldFontName);
+            PdfFont regular = PdfFontFactory.createFont(fontName);
             DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd-MMM-yyyy", Locale.ENGLISH);
 
             DeviceRgb accent = new DeviceRgb(34, 83, 120);
+            try {
+                if (themeColor != null && themeColor.startsWith("#") && themeColor.length() == 7) {
+                    int r = Integer.parseInt(themeColor.substring(1, 3), 16);
+                    int g = Integer.parseInt(themeColor.substring(3, 5), 16);
+                    int b = Integer.parseInt(themeColor.substring(5, 7), 16);
+                    accent = new DeviceRgb(r, g, b);
+                }
+            } catch (Exception ignored) {}
+
             DeviceRgb dark = new DeviceRgb(34, 40, 49);
             DeviceRgb muted = new DeviceRgb(105, 112, 121);
             DeviceRgb line = new DeviceRgb(220, 225, 230);
@@ -164,6 +196,9 @@ public class InvoicePdfService {
                             .sum();
             double grandTotal = invoice.getTotalAmount() != null ? invoice.getTotalAmount() : subtotal;
             double balanceAdjustment = grandTotal - subtotal;
+            double netPayable = (invoice.getNetPayable() != null && invoice.getNetPayable() > 0)
+                    ? invoice.getNetPayable()
+                    : grandTotal;
 
             Table header = new Table(UnitValue.createPercentArray(new float[]{58, 42}))
                     .useAllAvailableWidth()
@@ -183,6 +218,9 @@ public class InvoicePdfService {
             addOptionalLine(leftHeader, labelValue("Phone", profile.getPhone()), regular, muted, 9);
             addOptionalLine(leftHeader, labelValue("Email", profile.getEmail()), regular, muted, 9);
             addOptionalLine(leftHeader, labelValue("GSTIN", profile.getGstin()), regular, muted, 9);
+            if (taxIdLabel != null && !taxIdLabel.trim().isEmpty() && taxIdValue != null && !taxIdValue.trim().isEmpty()) {
+                addOptionalLine(leftHeader, labelValue(taxIdLabel.trim(), taxIdValue.trim()), regular, muted, 9);
+            }
 
             leftHeader.add(new Paragraph("\nBill To")
                     .setFont(bold)
@@ -207,7 +245,7 @@ public class InvoicePdfService {
                     .setPadding(0)
                     .setTextAlignment(TextAlignment.RIGHT);
 
-            byte[] logoBytes = loadImage(profile.getLogoPath(), 600, 240, true);
+            byte[] logoBytes = showLogo ? loadImage(profile.getLogoPath(), 600, 240, true) : null;
             if (logoBytes != null) {
                 rightHeader.add(new Image(ImageDataFactory.create(logoBytes))
                         .setMaxWidth(130)
@@ -237,18 +275,33 @@ public class InvoicePdfService {
                     .setMarginTop(4);
 
             for (String h : new String[]{"Date", "Description", "Rate", "Qty", "Amount"}) {
-                itemTable.addHeaderCell(new Cell()
+                com.itextpdf.layout.properties.TextAlignment align = h.equals("Description") ? TextAlignment.LEFT : TextAlignment.RIGHT;
+                DeviceRgb headerTextColor = "MODERN".equalsIgnoreCase(templateStyle) ? new DeviceRgb(255, 255, 255) : dark;
+                Cell headerCell = new Cell()
                         .add(new Paragraph(h)
                                 .setFont(bold)
                                 .setFontSize(9)
-                                .setFontColor(dark))
-                        .setBackgroundColor(tableHeader)
+                                .setFontColor(headerTextColor))
                         .setPaddingTop(8)
                         .setPaddingBottom(8)
                         .setPaddingLeft(7)
                         .setPaddingRight(7)
-                        .setTextAlignment(h.equals("Description") ? TextAlignment.LEFT : TextAlignment.RIGHT)
-                        .setBorder(Border.NO_BORDER));
+                        .setTextAlignment(align);
+
+                if ("MODERN".equalsIgnoreCase(templateStyle)) {
+                    headerCell.setBackgroundColor(accent)
+                              .setBorder(Border.NO_BORDER);
+                } else if ("MINIMAL".equalsIgnoreCase(templateStyle)) {
+                    headerCell.setBackgroundColor(ColorConstants.WHITE)
+                              .setBorderBottom(new SolidBorder(accent, 1.2f))
+                              .setBorderTop(Border.NO_BORDER)
+                              .setBorderLeft(Border.NO_BORDER)
+                              .setBorderRight(Border.NO_BORDER);
+                } else {
+                    headerCell.setBackgroundColor(tableHeader)
+                              .setBorder(Border.NO_BORDER);
+                }
+                itemTable.addHeaderCell(headerCell);
             }
 
             for (ClientWork work : works) {
@@ -299,9 +352,18 @@ public class InvoicePdfService {
 
             byte[] qrBytes = loadImage(profile.getQrImagePath(), 256, 256, true);
             boolean hasQrCode = qrBytes != null || notEmpty(finalUpiId);
+            boolean hasUpi = notEmpty(finalUpiId);
 
-            Table footer = new Table(UnitValue.createPercentArray(
-                    hasQrCode ? new float[]{52, 20, 28} : new float[]{68, 32}))
+            float[] columnWidths;
+            if (hasQrCode && hasUpi) {
+                columnWidths = new float[]{42, 16, 18, 24};
+            } else if (hasQrCode) {
+                columnWidths = new float[]{52, 20, 28};
+            } else {
+                columnWidths = new float[]{68, 32};
+            }
+
+            Table footer = new Table(UnitValue.createPercentArray(columnWidths))
                     .useAllAvailableWidth();
 
             Cell bankCell = new Cell()
@@ -345,6 +407,31 @@ public class InvoicePdfService {
 
             footer.addCell(bankCell);
 
+            if (hasUpi) {
+                Cell payCell = new Cell()
+                        .setBorder(new SolidBorder(line, 0.7f))
+                        .setPadding(10)
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setVerticalAlignment(VerticalAlignment.MIDDLE);
+
+                Paragraph payBtn = new Paragraph()
+                        .setBackgroundColor(accent)
+                        .setPadding(6)
+                        .setMarginLeft(4f)
+                        .setMarginRight(4f)
+                        .setTextAlignment(TextAlignment.CENTER);
+
+                Link link = new Link("Pay Now", PdfAction.createURI(upiPaymentPayload(profile.getBusinessName(), finalUpiId, netPayable)));
+                link.setFont(bold)
+                        .setFontSize(9.5f)
+                        .setFontColor(ColorConstants.WHITE);
+                link.getLinkAnnotation().setBorder(new PdfAnnotationBorder(0, 0, 0));
+
+                payBtn.add(link);
+                payCell.add(payBtn);
+                footer.addCell(payCell);
+            }
+
             if (hasQrCode) {
                 Cell qrCell = new Cell()
                         .setBorder(new SolidBorder(line, 0.7f))
@@ -358,7 +445,7 @@ public class InvoicePdfService {
                             .setMaxHeight(72)
                             .setHorizontalAlignment(HorizontalAlignment.CENTER));
                 } else {
-                    addGeneratedUpiQr(qrCell, profile.getBusinessName(), finalUpiId, pdf);
+                    addGeneratedUpiQr(qrCell, profile.getBusinessName(), finalUpiId, netPayable, pdf);
                 }
 
                 if (notEmpty(finalUpiId)) {
@@ -555,9 +642,9 @@ public class InvoicePdfService {
         return value != null && !value.trim().isEmpty();
     }
 
-    private void addGeneratedUpiQr(Cell qrCell, String businessName, String upiId, PdfDocument pdf) {
+    private void addGeneratedUpiQr(Cell qrCell, String businessName, String upiId, double amount, PdfDocument pdf) {
         try {
-            BarcodeQRCode barcodeQRCode = new BarcodeQRCode(upiPaymentPayload(businessName, upiId));
+            BarcodeQRCode barcodeQRCode = new BarcodeQRCode(upiPaymentPayload(businessName, upiId, amount));
             PdfFormXObject qrObject = barcodeQRCode.createFormXObject(ColorConstants.BLACK, pdf);
 
             qrCell.add(new Image(qrObject)
@@ -572,7 +659,7 @@ public class InvoicePdfService {
         }
     }
 
-    private String upiPaymentPayload(String businessName, String upiId) {
+    private String upiPaymentPayload(String businessName, String upiId, double amount) {
         StringBuilder payload = new StringBuilder("upi://pay?pa=")
                 .append(urlEncode(upiId));
 
@@ -580,6 +667,7 @@ public class InvoicePdfService {
             payload.append("&pn=").append(urlEncode(businessName));
         }
 
+        payload.append("&am=").append(formatAmount(amount));
         payload.append("&cu=INR");
         return payload.toString();
     }
