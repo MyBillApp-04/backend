@@ -56,7 +56,19 @@ public class InvoiceService {
             LocalDateTime dueDate
     ) {
         Long userId = securityUtils.getCurrentUserId();
+        return generateInvoiceForUser(clientId, workIds, discount, notes, dueDate, userId);
+    }
 
+    @Transactional
+    @CacheEvict(value = "dashboardStats", allEntries = true)
+    public Invoice generateInvoiceForUser(
+            UUID clientId,
+            List<UUID> workIds,
+            Double discount,
+            String notes,
+            LocalDateTime dueDate,
+            Long userId
+    ) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 

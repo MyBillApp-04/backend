@@ -3,6 +3,8 @@ package com.mybill.MyBill_Backend.security;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.mybill.MyBill_Backend.util.SecurityUtils;
+import com.mybill.MyBill_Backend.entity.User;
+import com.mybill.MyBill_Backend.entity.Role;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -72,9 +74,38 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         String userKey = currentUserKey();
-        if (userKey != null && isExceeded(userKey, userLimitPerMinute)) {
-            reject(response, "Too many requests for this user");
-            return;
+
+        // 1. Feature/Endpoint specific rate limiting (Heavy resource protection)
+        if (path.contains("/pdf")) {
+            String pdfKey = (userKey != null ? userKey : ipKey) + ":pdf";
+            if (isExceeded(pdfKey, 10)) { // Capped at 10 requests per minute
+                reject(response, "Too many invoice PDF generation requests. Please wait before exporting again");
+                return;
+            }
+        }
+
+        if (path.startsWith("/api/reports")) {
+            String reportKey = (userKey != null ? userKey : ipKey) + ":reports";
+            if (isExceeded(reportKey, 20)) { // Capped at 20 requests per minute
+                reject(response, "Too many reporting & analytics requests. Please wait before reloading reports");
+                return;
+            }
+        }
+
+        // 2. User & Role based rate limiting
+        if (userKey != null) {
+            int limit = userLimitPerMinute; // Default: 300
+            try {
+                User user = securityUtils.getCurrentUser();
+                if (user != null && user.getRole() == Role.ADMIN) {
+                    limit = 5000; // Admins get high throughput limits
+                }
+            } catch (Exception ignored) {}
+
+            if (isExceeded(userKey, limit)) {
+                reject(response, "Too many requests. API rate limit quota exceeded for this account");
+                return;
+            }
         }
 
         filterChain.doFilter(request, response);
