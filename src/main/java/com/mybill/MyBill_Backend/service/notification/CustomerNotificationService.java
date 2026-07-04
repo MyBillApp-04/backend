@@ -65,11 +65,26 @@ public class CustomerNotificationService {
             return;
         }
 
-        // Validate phone number
+        // Validate and normalize phone number
         String phone = customer.getPhone();
-        if (phone == null || phone.trim().isEmpty() || phone.replaceAll("[^0-9]", "").length() < 10) {
-            log.warn("Cannot send notification. Customer {} has an invalid phone number: {}", customer.getName(), phone);
+        if (phone == null || phone.trim().isEmpty()) {
+            log.warn("Cannot send notification. Customer {} has no phone number", customer.getName());
             return;
+        }
+
+        String digitsOnly = phone.replaceAll("[^0-9]", "");
+        if (digitsOnly.startsWith("0") && digitsOnly.length() > 10) {
+            digitsOnly = digitsOnly.substring(1);
+        }
+
+        String normalizedPhone;
+        if (digitsOnly.length() == 10) {
+            normalizedPhone = "91" + digitsOnly; // Default to India country code prefix
+        } else if (digitsOnly.length() < 10) {
+            log.warn("Cannot send notification. Customer {} has an invalid phone number length: {}", customer.getName(), phone);
+            return;
+        } else {
+            normalizedPhone = digitsOnly;
         }
 
         // Check for duplicates (only for Invoice triggers where we don't want duplicate sends)
@@ -104,7 +119,7 @@ public class CustomerNotificationService {
                     .user(user)
                     .customer(customer)
                     .invoice(invoice)
-                    .phoneNumber(phone)
+                    .phoneNumber(normalizedPhone)
                     .notificationType(type)
                     .channel(channel)
                     .status("PENDING")
