@@ -27,6 +27,12 @@ public class CustomerNotificationEventListener {
         Invoice invoice = event.getInvoice();
         log.info("Handling InvoiceCreatedEvent for invoice: {}", invoice.getInvoiceNumber());
 
+        // Skip sending automated alerts for backdated/historical synced invoices (created more than 24 hours ago)
+        if (invoice.getInvoiceDate() != null && invoice.getInvoiceDate().isBefore(java.time.LocalDateTime.now().minusDays(1))) {
+            log.info("Skipping automated notification trigger for historical synced invoice: {}", invoice.getInvoiceNumber());
+            return;
+        }
+
         Map<String, Object> context = new HashMap<>();
         context.put("amount", invoice.getTotalAmount());
         context.put("remainingAmount", invoice.getRemainingAmount());
