@@ -407,7 +407,7 @@ public class InvoicePdfService {
 
             footer.addCell(bankCell);
 
-            if (hasUpi) {
+            if (hasUpi && !hasQrCode) {
                 Cell payCell = new Cell()
                         .setBorder(new SolidBorder(line, 0.7f))
                         .setPadding(10)
@@ -448,14 +448,23 @@ public class InvoicePdfService {
                     addGeneratedUpiQr(qrCell, profile.getBusinessName(), finalUpiId, netPayable, pdf);
                 }
 
-                if (notEmpty(finalUpiId)) {
-                    qrCell.add(new Paragraph("UPI: " + finalUpiId.trim())
-                            .setFont(regular)
-                            .setFontSize(7.5f)
-                            .setFontColor(muted)
-                            .setTextAlignment(TextAlignment.CENTER)
-                            .setMarginTop(4));
-                }
+                // Add a "Pay Now" button below the QR code
+                Paragraph payBtn = new Paragraph()
+                        .setBackgroundColor(accent)
+                        .setPadding(4)
+                        .setMarginLeft(2f)
+                        .setMarginRight(2f)
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setMarginTop(4);
+
+                Link link = new Link("Pay Now", PdfAction.createURI(upiPaymentPayload(profile.getBusinessName(), finalUpiId, netPayable)));
+                link.setFont(bold)
+                        .setFontSize(8.0f)
+                        .setFontColor(ColorConstants.WHITE);
+                link.getLinkAnnotation().setBorder(new PdfAnnotationBorder(0, 0, 0));
+
+                payBtn.add(link);
+                qrCell.add(payBtn);
 
                 footer.addCell(qrCell);
             }
