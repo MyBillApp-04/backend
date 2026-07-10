@@ -17,8 +17,11 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -34,6 +37,7 @@ public class EmailService {
     private final InvoiceService invoiceService;
     private final InvoicePdfService invoicePdfService;
     private final SecurityUtils securityUtils;
+    private final AsyncJobService asyncJobService;
 
     @Value("${app.email.from:no-reply@mybill.local}")
     private String fromAddress;
@@ -42,6 +46,7 @@ public class EmailService {
     private int maxRetryAttempts;
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "emailTemplates", key = "@securityUtils.getCurrentUserId()")
     public List<EmailTemplate> listTemplates() {
         return templateRepository.findAvailableTemplates(
                 securityUtils.getCurrentUserId()
@@ -49,6 +54,7 @@ public class EmailService {
     }
 
     @Transactional
+    @CacheEvict(value = "emailTemplates", key = "@securityUtils.getCurrentUserId()")
     public EmailTemplate createTemplate(EmailTemplateRequest request) {
         EmailTemplate template = EmailTemplate.builder()
                 .user(securityUtils.getCurrentUser())
@@ -60,6 +66,7 @@ public class EmailService {
     }
 
     @Transactional
+    @CacheEvict(value = "emailTemplates", key = "@securityUtils.getCurrentUserId()")
     public EmailTemplate updateTemplate(UUID templateId, EmailTemplateRequest request) {
         EmailTemplate template = templateRepository.findByTemplateIdAndUserId(templateId, securityUtils.getCurrentUserId())
                 .orElseThrow(() -> new RuntimeException("Email template not found"));
@@ -71,6 +78,7 @@ public class EmailService {
     }
 
     @Transactional
+    @CacheEvict(value = "emailTemplates", key = "@securityUtils.getCurrentUserId()")
     public void deleteTemplate(UUID templateId) {
         EmailTemplate template = templateRepository.findByTemplateIdAndUserId(templateId, securityUtils.getCurrentUserId())
                 .orElseThrow(() -> new RuntimeException("Email template not found"));
@@ -98,7 +106,22 @@ public class EmailService {
                 .build();
 
         log = emailLogRepository.save(log);
-        return attemptSend(log, Boolean.TRUE.equals(request.getAttachInvoicePdf()));
+
+        Map<String, Object> payload = Map.of(
+            "recipient", log.getRecipient(),
+            "subject", log.getSubject(),
+            "body", log.getBody(),
+            "templateType", log.getTemplateType(),
+            "attachInvoicePdf", Boolean.TRUE.equals(request.getAttachInvoicePdf())
+        );
+
+        try {
+            asyncJobService.enqueue("EMAIL", payload, log.getUser(), log.getInvoiceId());
+        } catch (Exception e) {
+            attemptSend(log, Boolean.TRUE.equals(request.getAttachInvoicePdf()));
+        }
+
+        return log;
     }
 
     @Transactional(readOnly = true)
@@ -154,13 +177,29 @@ public class EmailService {
                 .build();
 
         log = emailLogRepository.save(log);
-        return attemptSend(log, false);
+
+        Map<String, Object> payload = Map.of(
+            "recipient", log.getRecipient(),
+            "subject", log.getSubject(),
+            "body", log.getBody(),
+            "templateType", log.getTemplateType(),
+            "attachInvoicePdf", false
+        );
+
+        try {
+            asyncJobService.enqueue("EMAIL", payload, log.getUser(), log.getInvoiceId());
+        } catch (Exception e) {
+            attemptSend(log, false);
+        }
+
+        return log;
     }
 
     public boolean reminderSentRecently(UUID invoiceId, String templateType, LocalDateTime since) {
         return emailLogRepository.existsByInvoiceIdAndTemplateTypeAndCreatedAtAfter(invoiceId, templateType, since);
     }
 
+    @CircuitBreaker(name = "emailService", fallbackMethod = "fallbackAttemptSend")
     public EmailLog attemptSend(EmailLog log, boolean attachInvoicePdf) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -188,6 +227,15 @@ public class EmailService {
         }
 
         log.setAttemptCount((log.getAttemptCount() == null ? 0 : log.getAttemptCount()) + 1);
+        return emailLogRepository.save(log);
+    }
+
+    public EmailLog fallbackAttemptSend(EmailLog log, boolean attachInvoicePdf, Throwable t) {
+        log.setStatus(EmailStatus.FAILED);
+        log.setErrorMessage("Circuit Breaker Open / Email Service Unavailable: " + t.getMessage());
+        int attempts = log.getAttemptCount() == null ? 0 : log.getAttemptCount();
+        log.setNextRetryAt(LocalDateTime.now().plusMinutes(Math.min(60, 5L * (attempts + 1))));
+        log.setAttemptCount(attempts + 1);
         return emailLogRepository.save(log);
     }
 

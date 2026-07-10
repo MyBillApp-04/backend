@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mybill.MyBill_Backend.dto.BackupRequest;
 import com.mybill.MyBill_Backend.entity.*;
 import com.mybill.MyBill_Backend.repository.BackupJobRepository;
+import com.mybill.MyBill_Backend.service.backup.BackupChecksum;
 import com.mybill.MyBill_Backend.service.backup.BackupStorageClient;
 import com.mybill.MyBill_Backend.util.SecurityUtils;
 import jakarta.persistence.EntityManager;
@@ -29,6 +30,7 @@ public class BackupService {
     private final SecurityUtils securityUtils;
     private final ObjectMapper objectMapper;
     private final List<BackupStorageClient> storageClients;
+    private final AsyncJobService asyncJobService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -55,10 +57,23 @@ public class BackupService {
 
         try {
             Path location = writeLocalBackup(job);
-            String remoteLocation = storageClient(provider).store(job, location);
-            job.setLocation(remoteLocation);
-            job.setStatus(BackupStatus.COMPLETED);
-            job.setCompletedAt(LocalDateTime.now());
+            String sha256 = BackupChecksum.sha256Hex(location);
+            job.setSha256(sha256);
+
+            if (provider == BackupProvider.GOOGLE_DRIVE) {
+                job.setStatus(BackupStatus.REQUESTED);
+                Map<String, Object> payload = Map.of(
+                    "backupJobId", job.getBackupId().toString(),
+                    "localFilePath", location.toAbsolutePath().toString(),
+                    "sha256", sha256
+                );
+                asyncJobService.enqueue("GOOGLE_DRIVE_BACKUP", payload, job.getUser(), null);
+            } else {
+                String remoteLocation = storageClient(provider).store(job, location, sha256);
+                job.setLocation(remoteLocation);
+                job.setStatus(BackupStatus.COMPLETED);
+                job.setCompletedAt(LocalDateTime.now());
+            }
         } catch (Exception exception) {
             job.setStatus(BackupStatus.FAILED);
             job.setErrorMessage(exception.getMessage());

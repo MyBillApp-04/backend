@@ -8,5 +8,5 @@ import java.nio.file.Path;
 public interface BackupStorageClient {
     BackupProvider provider();
 
-    String store(BackupJob job, Path localBackupFile) throws Exception;
+    String store(BackupJob job, Path localBackupFile, String expectedSha256) throws Exception;
 }

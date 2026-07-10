@@ -19,7 +19,9 @@ import com.mybill.MyBill_Backend.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.context.ApplicationEventPublisher;
 import com.mybill.MyBill_Backend.event.InvoiceCreatedEvent;
@@ -375,15 +377,16 @@ public class InvoiceService {
         return invoiceRepository.findProjectedByClientIdAndUserIdAndIsDeletedFalse(
                 clientId,
                 userId,
-                pageable
+                defaultInvoicePageable(pageable)
         );
     }
 
     @Transactional(readOnly = true)
-    public List<Invoice> searchInvoices(
+    public Page<Invoice> searchInvoices(
             String clientName,
             Integer month,
-            Integer year
+            Integer year,
+            Pageable pageable
     ) {
         Long userId = securityUtils.getCurrentUserId();
         String safeClientName = clientName == null ? "" : clientName.trim();
@@ -392,7 +395,8 @@ public class InvoiceService {
                 userId,
                 safeClientName,
                 month,
-                year
+                year,
+                defaultInvoicePageable(pageable)
         );
     }
 
@@ -412,7 +416,7 @@ public class InvoiceService {
                 safeClientName,
                 month,
                 year,
-                pageable
+                defaultInvoicePageable(pageable)
         );
     }
 
@@ -436,7 +440,7 @@ public class InvoiceService {
                     safeFilter.getEndDate(),
                     safeFilter.getMinAmount(),
                     safeFilter.getMaxAmount(),
-                    pageable
+                    defaultInvoicePageable(pageable)
             );
         }
 
@@ -449,7 +453,7 @@ public class InvoiceService {
                 statuses,
                 safeFilter.getMinAmount(),
                 safeFilter.getMaxAmount(),
-                pageable
+                defaultInvoicePageable(pageable)
         );
     }
 
@@ -457,22 +461,39 @@ public class InvoiceService {
     public Page<Invoice> getInvoices(Pageable pageable) {
         Long userId = securityUtils.getCurrentUserId();
 
-        return invoiceRepository.findByUserIdAndIsDeletedFalse(userId, pageable);
+        return invoiceRepository.findByUserIdAndIsDeletedFalse(userId, defaultInvoicePageable(pageable));
     }
 
     @Transactional(readOnly = true)
     public Page<InvoiceProjection> getInvoicesProjected(Pageable pageable) {
         Long userId = securityUtils.getCurrentUserId();
-        return invoiceRepository.findProjectedByUserIdAndIsDeletedFalse(userId, pageable);
+        return invoiceRepository.findProjectedByUserIdAndIsDeletedFalse(userId, defaultInvoicePageable(pageable));
     }
 
     @Transactional(readOnly = true)
-    public List<Invoice> getInvoicesUpdatedSince(LocalDateTime since) {
+    public Page<Invoice> getInvoicesUpdatedSince(LocalDateTime since, Pageable pageable) {
         Long userId = securityUtils.getCurrentUserId();
 
         return invoiceRepository.findByUserIdAndUpdatedAtAfter(
                 userId,
-                since
+                since,
+                defaultInvoicePageable(pageable)
+        );
+    }
+
+    private Pageable defaultInvoicePageable(Pageable pageable) {
+        if (pageable == null || pageable.isUnpaged()) {
+            return PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdDate"));
+        }
+
+        if (pageable.getSort().isSorted()) {
+            return pageable;
+        }
+
+        return PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by(Sort.Direction.DESC, "createdDate")
         );
     }
 

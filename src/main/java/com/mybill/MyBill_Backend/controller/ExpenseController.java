@@ -3,6 +3,7 @@ package com.mybill.MyBill_Backend.controller;
 import com.mybill.MyBill_Backend.dto.ExpenseDTO;
 import com.mybill.MyBill_Backend.entity.Expense;
 import com.mybill.MyBill_Backend.service.ExpenseService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,7 +35,7 @@ public class ExpenseController {
     }
 
     @PostMapping
-    public ResponseEntity<ExpenseDTO> createExpense(@RequestBody ExpenseDTO dto) {
+    public ResponseEntity<ExpenseDTO> createExpense(@Valid @RequestBody ExpenseDTO dto) {
         Expense created = expenseService.createExpense(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(toDTO(created));
     }
@@ -42,7 +43,7 @@ public class ExpenseController {
     @PutMapping("/{id}")
     public ResponseEntity<ExpenseDTO> updateExpense(
             @PathVariable UUID id,
-            @RequestBody ExpenseDTO dto
+            @Valid @RequestBody ExpenseDTO dto
     ) {
         Expense updated = expenseService.updateExpense(id, dto);
         return ResponseEntity.ok(toDTO(updated));

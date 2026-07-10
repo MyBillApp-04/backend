@@ -43,8 +43,10 @@ public class InvoiceItem {
     private User user;
 
     private String description;
+    @Column(columnDefinition = "double precision")
     private Double rate;
     private Integer quantity;
+    @Column(columnDefinition = "double precision")
     private Double amount;
 
     private LocalDateTime createdAt;

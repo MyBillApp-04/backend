@@ -6,6 +6,7 @@ import com.mybill.MyBill_Backend.entity.AuthProvider;
 import com.mybill.MyBill_Backend.entity.Role;
 import com.mybill.MyBill_Backend.service.AuthService;
 import com.mybill.MyBill_Backend.security.RateLimitFilter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,9 @@ public class AuthControllerTest {
     @Autowired
     private RateLimitFilter rateLimitFilter;
 
+    @Autowired
+    private MeterRegistry meterRegistry;
+
     private MockedStatic<FirebaseAuth> mockedFirebaseAuth;
     private FirebaseAuth firebaseAuth;
     private FirebaseToken firebaseToken;
@@ -63,7 +67,7 @@ public class AuthControllerTest {
         mockedFirebaseAuth = mockStatic(FirebaseAuth.class);
         mockedFirebaseAuth.when(FirebaseAuth::getInstance).thenReturn(firebaseAuth);
 
-        when(firebaseAuth.verifyIdToken(anyString())).thenReturn(firebaseToken);
+        when(firebaseAuth.verifyIdToken(anyString(), eq(true))).thenReturn(firebaseToken);
     }
 
     @AfterEach
@@ -88,13 +92,18 @@ public class AuthControllerTest {
         when(firebaseToken.getClaims()).thenReturn(claims);
         when(authService.firebaseLogin(eq(testEmail), eq(testName), eq(AuthProvider.GOOGLE), eq(Role.CLIENT)))
                 .thenReturn(testJwt);
+        double before = counterValue("auth_success", "refresh", "accepted");
 
         mockMvc.perform(post("/api/auth/firebase-login")
+                        .header("X-Auth-Flow", "refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"token\":\"valid-google-id-token\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").value(testJwt));
 
+        org.assertj.core.api.Assertions.assertThat(
+                counterValue("auth_success", "refresh", "accepted") - before
+        ).isEqualTo(1.0);
         verify(authService, times(1)).firebaseLogin(eq(testEmail), eq(testName), eq(AuthProvider.GOOGLE), eq(Role.CLIENT));
     }
 
@@ -136,12 +145,24 @@ public class AuthControllerTest {
 
     @Test
     void testLoginFailureInvalidToken() throws Exception {
-        when(firebaseAuth.verifyIdToken("invalid-token")).thenThrow(new RuntimeException("Invalid token"));
+        when(firebaseAuth.verifyIdToken("invalid-token", true)).thenThrow(new RuntimeException("Invalid token"));
+        double before = counterValue("auth_failure", "login", "server_error");
 
         mockMvc.perform(post("/api/auth/firebase-login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"token\":\"invalid-token\"}"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.error").value("Server-side login failure"));
+
+        org.assertj.core.api.Assertions.assertThat(
+                counterValue("auth_failure", "login", "server_error") - before
+        ).isEqualTo(1.0);
+    }
+
+    private double counterValue(String name, String flow, String outcome) {
+        var counter = meterRegistry.find(name)
+                .tags("flow", flow, "outcome", outcome)
+                .counter();
+        return counter == null ? 0.0 : counter.count();
     }
 }

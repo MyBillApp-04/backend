@@ -2,8 +2,10 @@ package com.mybill.MyBill_Backend.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import com.mybill.MyBill_Backend.observability.RequestCorrelationFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -31,6 +33,9 @@ public class GlobalExceptionHandler {
     private static final Logger log =
             LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private io.micrometer.core.instrument.MeterRegistry meterRegistry;
+
     public static class NotFoundException extends RuntimeException {
         public NotFoundException(String message) {
             super(message);
@@ -53,7 +58,8 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(
                 HttpStatus.NOT_FOUND,
                 "Resource not found",
-                request.getRequestURI()
+                request.getRequestURI(),
+                ex
         );
     }
 
@@ -67,7 +73,8 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(
                 HttpStatus.FORBIDDEN,
                 "You do not have permission to perform this action",
-                request.getRequestURI()
+                request.getRequestURI(),
+                ex
         );
     }
 
@@ -93,7 +100,10 @@ public class GlobalExceptionHandler {
         body.put("error", HttpStatus.BAD_REQUEST.getReasonPhrase());
         body.put("message", "Validation failed");
         body.put("path", request.getRequestURI());
+        body.put("requestId", currentRequestId());
         body.put("fieldErrors", fieldErrors);
+
+        incrementErrorMetric(HttpStatus.BAD_REQUEST, ex, request.getRequestURI());
 
         return ResponseEntity.badRequest().body(body);
     }
@@ -105,21 +115,27 @@ public class GlobalExceptionHandler {
     ) {
         log.warn("Image upload failed [{}]: {}", ex.getCode(), ex.getMessage());
         ResponseEntity<Map<String, Object>> response = buildErrorResponse(
-                ex.getStatus(), ex.getMessage(), request.getRequestURI());
+                ex.getStatus(), ex.getMessage(), request.getRequestURI(), ex);
         response.getBody().put("code", ex.getCode());
         return response;
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ResponseEntity<Map<String, Object>> handleUploadTooLarge(HttpServletRequest request) {
+    public ResponseEntity<Map<String, Object>> handleUploadTooLarge(
+            MaxUploadSizeExceededException ex,
+            HttpServletRequest request
+    ) {
         return buildErrorResponse(HttpStatus.PAYLOAD_TOO_LARGE,
-                "Image must be 10 MB or smaller.", request.getRequestURI());
+                "Image must be 10 MB or smaller.", request.getRequestURI(), ex);
     }
 
     @ExceptionHandler(MissingServletRequestPartException.class)
-    public ResponseEntity<Map<String, Object>> handleMissingUploadFile(HttpServletRequest request) {
+    public ResponseEntity<Map<String, Object>> handleMissingUploadFile(
+            MissingServletRequestPartException ex,
+            HttpServletRequest request
+    ) {
         return buildErrorResponse(HttpStatus.BAD_REQUEST,
-                "Image file is required. Please choose an image and try again.", request.getRequestURI());
+                "Image file is required. Please choose an image and try again.", request.getRequestURI(), ex);
     }
 
     @ExceptionHandler({MultipartException.class, HttpMediaTypeNotSupportedException.class})
@@ -130,7 +146,9 @@ public class GlobalExceptionHandler {
         log.warn("Malformed image upload: {}", ex.getMessage());
         return buildErrorResponse(HttpStatus.BAD_REQUEST,
                 "Image upload format is invalid. Please choose the image again and retry.",
-                request.getRequestURI());
+                request.getRequestURI(),
+                ex
+        );
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -143,7 +161,8 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(
                 HttpStatus.BAD_REQUEST,
                 "Validation failed",
-                request.getRequestURI()
+                request.getRequestURI(),
+                ex
         );
     }
 
@@ -155,7 +174,8 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(
                 HttpStatus.BAD_REQUEST,
                 "Missing required request header: " + ex.getHeaderName(),
-                request.getRequestURI()
+                request.getRequestURI(),
+                ex
         );
     }
 
@@ -169,7 +189,8 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(
                 HttpStatus.NOT_FOUND,
                 "API endpoint not found",
-                request.getRequestURI()
+                request.getRequestURI(),
+                ex
         );
     }
 
@@ -183,7 +204,8 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(
                 HttpStatus.BAD_REQUEST,
                 "Invalid request. Please check the submitted data",
-                request.getRequestURI()
+                request.getRequestURI(),
+                ex
         );
     }
 
@@ -197,7 +219,8 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(
                 HttpStatus.FORBIDDEN,
                 "Request failed security validation",
-                request.getRequestURI()
+                request.getRequestURI(),
+                ex
         );
     }
 
@@ -209,10 +232,10 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(
                 HttpStatus.valueOf(ex.getStatusCode().value()),
                 ex.getReason() != null ? ex.getReason() : ex.getStatusCode().toString(),
-                request.getRequestURI()
+                request.getRequestURI(),
+                ex
         );
     }
-
 
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<Map<String, Object>> handleDatabaseException(
@@ -224,7 +247,8 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "Database error. Please try again later",
-                request.getRequestURI()
+                request.getRequestURI(),
+                ex
         );
     }
 
@@ -238,7 +262,8 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(
                 HttpStatus.CONFLICT,
                 "A conflicting record already exists. Refresh and try again",
-                request.getRequestURI()
+                request.getRequestURI(),
+                ex
         );
     }
 
@@ -252,7 +277,8 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "Database save failed. Please check the submitted profile details",
-                request.getRequestURI()
+                request.getRequestURI(),
+                ex
         );
     }
 
@@ -266,7 +292,8 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "Something went wrong. Please try again later",
-                request.getRequestURI()
+                request.getRequestURI(),
+                ex
         );
     }
 
@@ -280,22 +307,116 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "Unexpected server error. Please try again later",
-                request.getRequestURI()
+                request.getRequestURI(),
+                ex
         );
+    }
+
+    private void incrementErrorMetric(HttpStatus status, Throwable ex, String path) {
+        if (meterRegistry != null && status != null && status.isError()) {
+            try {
+                String exName = ex != null ? ex.getClass().getSimpleName() : "None";
+                meterRegistry.counter("mybill.api.errors",
+                        "status", String.valueOf(status.value()),
+                        "exception", exName,
+                        "path", path != null ? path : "unknown"
+                ).increment();
+            } catch (Exception e) {
+                // Ignore metric execution errors
+            }
+        }
     }
 
     private ResponseEntity<Map<String, Object>> buildErrorResponse(
             HttpStatus status,
             String message,
-            String path
+            String path,
+            Throwable ex
     ) {
+        incrementErrorMetric(status, ex, path);
+
+        jakarta.servlet.http.HttpServletRequest request = null;
+        try {
+            org.springframework.web.context.request.RequestAttributes attributes = 
+                    org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+            if (attributes instanceof org.springframework.web.context.request.ServletRequestAttributes servletAttributes) {
+                request = servletAttributes.getRequest();
+            }
+        } catch (Exception e) {
+            // Ignore if request context is not active
+        }
+
+        String userIdStr = "ANONYMOUS";
+        String invoiceIdStr = "NONE";
+        if (request != null) {
+            try {
+                org.springframework.security.core.Authentication auth = 
+                        org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+                if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
+                    if (auth.getDetails() instanceof Long userId) {
+                        userIdStr = String.valueOf(userId);
+                    } else {
+                        userIdStr = auth.getName();
+                    }
+                }
+            } catch (Exception e) {
+                // Ignore security context failures
+            }
+
+            try {
+                String uri = request.getRequestURI();
+                java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(
+                        "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}"
+                ).matcher(uri);
+                if (matcher.find()) {
+                    invoiceIdStr = matcher.group();
+                } else {
+                    String paramVal = request.getParameter("invoiceId");
+                    if (paramVal != null && !paramVal.isBlank()) {
+                        invoiceIdStr = paramVal;
+                    }
+                }
+            } catch (Exception e) {
+                // Ignore parsing failures
+            }
+
+        }
+
+        logException(status, path, userIdStr, invoiceIdStr, message, ex);
+
         Map<String, Object> body = new HashMap<>();
         body.put("timestamp", LocalDateTime.now());
         body.put("status", status.value());
         body.put("error", status.getReasonPhrase());
         body.put("message", message);
         body.put("path", path);
+        body.put("requestId", currentRequestId());
 
         return ResponseEntity.status(status).body(body);
+    }
+
+    private void logException(
+            HttpStatus status,
+            String path,
+            String userId,
+            String resourceId,
+            String message,
+            Throwable ex
+    ) {
+        if (status.is5xxServerError()) {
+            log.error("api_error status={} path={} userId={} resourceId={} message={}",
+                    status.value(), path, userId, resourceId, message, ex);
+            return;
+        }
+
+        log.warn("api_error status={} path={} userId={} resourceId={} exception={} message={}",
+                status.value(), path, userId, resourceId,
+                ex != null ? ex.getClass().getSimpleName() : "None",
+                message);
+    }
+
+    private String currentRequestId() {
+        String requestId = MDC.get(RequestCorrelationFilter.REQUEST_ID_MDC_KEY);
+        return requestId != null && !requestId.isBlank() ? requestId : "unknown";
     }
 }

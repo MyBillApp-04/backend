@@ -56,16 +56,25 @@ public class Invoice {
     private Integer sequenceNo;
 
     // Financial Math
+    @Column(columnDefinition = "double precision")
     private Double subtotal;
+    @Column(columnDefinition = "double precision")
     private Double discount;
+    @Column(columnDefinition = "double precision")
     private Double grossAmount;
+    @Column(columnDefinition = "double precision")
     private Double advanceApplied;
+    @Column(columnDefinition = "double precision")
     private Double netPayable;
+    @Column(columnDefinition = "double precision")
     private Double totalAmount;
 
     // Payment Tracking
+    @Column(columnDefinition = "double precision")
     private Double paidAmount;
+    @Column(columnDefinition = "double precision")
     private Double pendingAmount;
+    @Column(columnDefinition = "double precision")
     private Double remainingAmount;
 
     @Enumerated(EnumType.STRING)

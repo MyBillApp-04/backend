@@ -70,8 +70,9 @@ public class ClientWorkController {
 
     @GetMapping("/sync")
     public List<ClientWorkDTO> getWorkUpdatedSince(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime since
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime since,
+            org.springframework.data.domain.Pageable pageable
     ) {
-        return workService.getWorkUpdatedSince(since);
+        return workService.getWorkUpdatedSince(since, pageable).getContent();
     }
 }

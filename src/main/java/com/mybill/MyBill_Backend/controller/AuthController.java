@@ -2,9 +2,13 @@ package com.mybill.MyBill_Backend.controller;
 
 import com.mybill.MyBill_Backend.entity.AuthProvider;
 import com.mybill.MyBill_Backend.entity.Role;
+import com.mybill.MyBill_Backend.security.JwtTokenDenylist;
+import com.mybill.MyBill_Backend.security.JwtUtil;
 import com.mybill.MyBill_Backend.service.AuthService;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseToken;
+import jakarta.servlet.http.HttpServletRequest;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,20 +25,29 @@ public class AuthController {
 
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
     private final AuthService authService;
+    private final MeterRegistry meterRegistry;
+    private final JwtUtil jwtUtil;
+    private final JwtTokenDenylist tokenDenylist;
 
     @PostMapping("/firebase-login")
-    public ResponseEntity<?> firebaseLogin(@RequestBody Map<String, String> body) {
+    public ResponseEntity<?> firebaseLogin(
+            @RequestBody Map<String, String> body,
+            @RequestHeader(name = "X-Auth-Flow", defaultValue = "login") String requestedFlow
+    ) {
+        String flow = "refresh".equalsIgnoreCase(requestedFlow) ? "refresh" : "login";
         String idToken = body.get("token");
 
         if (idToken == null || idToken.isBlank()) {
+            recordAuthResult("auth_failure", flow, "missing_token");
             return ResponseEntity.badRequest().body(Map.of("error", "Missing token in request body"));
         }
 
         try {
-            FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(idToken);
+            FirebaseToken decodedToken = verifyIdToken(idToken);
 
             String email = decodedToken.getEmail();
             if (email == null || email.isBlank()) {
+                recordAuthResult("auth_failure", flow, "missing_email");
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                         .body(Map.of("error", "Firebase token does not contain an email address"));
             }
@@ -63,10 +76,12 @@ public class AuthController {
             }
 
             String jwt = authService.firebaseLogin(email, name, provider, Role.CLIENT);
+            recordAuthResult("auth_success", flow, "accepted");
             log.info("Successful login for: {} via {}", email, provider);
             return ResponseEntity.ok(Map.of("token", jwt));
 
         } catch (Exception e) {
+            recordAuthResult("auth_failure", flow, "server_error");
             log.error("Firebase login failed", e);
 
             String msg = e.getMessage();
@@ -78,6 +93,31 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Server-side login failure"));
         }
+    }
+
+    private void recordAuthResult(String metric, String flow, String outcome) {
+        meterRegistry.counter(metric, "flow", flow, "outcome", outcome).increment();
+    }
+
+    protected FirebaseToken verifyIdToken(String idToken) throws Exception {
+        return FirebaseAuth.getInstance().verifyIdToken(idToken, true);
+    }
+
+    @DeleteMapping("/logout")
+    public ResponseEntity<?> logout(HttpServletRequest request) {
+        String token = bearerToken(request);
+        if (token != null && jwtUtil.validateToken(token)) {
+            tokenDenylist.deny(token, jwtUtil.extractExpiration(token));
+        }
+        return ResponseEntity.ok(Map.of("message", "Logged out"));
+    }
+
+    private String bearerToken(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (header == null || !header.startsWith("Bearer ")) {
+            return null;
+        }
+        return header.substring(7);
     }
 
     // Health check

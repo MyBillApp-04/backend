@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyBill - Async Retry & DLQ Admin Panel</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Premium Styles -->
+    <style>
+        :root {
+            --bg-base: #0f172a;
+            --bg-surface: #1e293b;
+            --bg-card: #2c354d;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --border: #334155;
+            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            font-family: var(--font-family);
+            line-height: 1.5;
+            padding-bottom: 3rem;
+        }
+
+        header {
+            background-color: var(--bg-surface);
+            border-bottom: 1px solid var(--border);
+            padding: 1.25rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo-section h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-section p {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        /* Alert Banner */
+        .alert-banner {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 100%);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-left: 5px solid var(--danger);
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            animation: pulse-border 2s infinite alternate;
+        }
+
+        @keyframes pulse-border {
+            0% { border-color: rgba(239, 68, 68, 0.3); }
+            100% { border-color: rgba(239, 68, 68, 0.8); }
+        }
+
+        .alert-content {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .alert-icon {
+            font-size: 1.75rem;
+            color: var(--danger);
+            animation: bounce 1s infinite alternate;
+        }
+
+        @keyframes bounce {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-4px); }
+        }
+
+        .alert-title {
+            font-weight: 600;
+            font-size: 1rem;
+            color: #fca5a5;
+        }
+
+        .alert-desc {
+            font-size: 0.875rem;
+            color: #f8fafc;
+            margin-top: 0.1rem;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .stat-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            border-color: rgba(99, 102, 241, 0.4);
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .stat-card.dead {
+            border-left: 4px solid var(--danger);
+        }
+
+        .stat-card.failed {
+            border-left: 4px solid var(--warning);
+        }
+
+        .stat-card.completed {
+            border-left: 4px solid var(--success);
+        }
+
+        .stat-card.running {
+            border-left: 4px solid var(--primary);
+        }
+
+        .stat-pulse {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .pulse-green {
+            background-color: var(--success);
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            animation: pulse-glow 1.5s infinite;
+        }
+
+        .pulse-red {
+            background-color: var(--danger);
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            animation: pulse-glow 1.5s infinite;
+        }
+
+        .pulse-indigo {
+            background-color: var(--primary);
+            box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7);
+            animation: pulse-glow 1.5s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        /* Controls */
+        .table-controls {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 12px 12px 0 0;
+            padding: 1.25rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .filter-tabs {
+            display: flex;
+            background-color: var(--bg-base);
+            border-radius: 8px;
+            padding: 0.25rem;
+            border: 1px solid var(--border);
+        }
+
+        .filter-tab {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            border: none;
+            background: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .filter-tab:hover {
+            color: var(--text-primary);
+        }
+
+        .filter-tab.active {
+            background-color: var(--primary);
+            color: var(--text-primary);
+        }
+
+        /* Main Table */
+        .table-container {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            background-color: rgba(15, 23, 42, 0.3);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            font-weight: 600;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            vertical-align: middle;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background-color: rgba(255, 255, 255, 0.02);
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.625rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-pending { background-color: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
+        .badge-running { background-color: rgba(99, 102, 241, 0.15); color: #a5b4fc; }
+        .badge-completed { background-color: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
+        .badge-failed { background-color: rgba(245, 159, 11, 0.15); color: #fde047; }
+        .badge-dead { background-color: rgba(239, 68, 68, 0.15); color: #fca5a5; }
+
+        .type-badge {
+            font-family: monospace;
+            background-color: rgba(255, 255, 255, 0.05);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Error block */
+        .error-text {
+            color: #f87171;
+            font-family: monospace;
+            font-size: 0.75rem;
+            max-width: 250px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: help;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.5rem 0.875rem;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-retry {
+            background-color: #3b82f6;
+        }
+
+        .btn-retry:hover {
+            background-color: #2563eb;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background-color: #1e293b;
+            border-left: 4px solid var(--success);
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transform: translateY(150%);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .toast.show {
+            transform: translateY(0);
+        }
+
+        .toast-title {
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .toast-body {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            margin-top: 0.1rem;
+        }
+        
+        .empty-state {
+            padding: 4rem;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+        
+        .empty-state h3 {
+            color: var(--text-primary);
+            font-size: 1.125rem;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-section">
+            <h1>MyBill Admin Control</h1>
+            <p>Async Job Scheduler & Dead Letter Queue (DLQ)</p>
+        </div>
+        <div>
+            <a href="/admin-jobs" class="btn" style="background-color: transparent; border: 1px solid var(--border); color: var(--text-secondary);">Refresh Console</a>
+        </div>
+    </header>
+
+    <div class="container">
+        
+        <!-- DLQ Alert Banner (Thymeleaf condition) -->
+        <div class="alert-banner" th:if="${dlqAlert}">
+            <div class="alert-content">
+                <div class="alert-icon">⚠️</div>
+                <div>
+                    <div class="alert-title">Dead Letter Queue Alert Threshold Exceeded</div>
+                    <div class="alert-desc" th:text="${'There are currently ' + deadCount + ' failed async jobs sitting in the Dead Letter Queue. Action required.'}">
+                        There are currently 12 failed async jobs sitting in the Dead Letter Queue. Action required.
+                    </div>
+                </div>
+            </div>
+            <div>
+                <!-- Add retry all button or notice -->
+                <span style="font-size: 0.8125rem; font-weight: 600; background-color: rgba(239, 68, 68, 0.2); padding: 0.35rem 0.75rem; border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.4);">
+                    HIGH PRIORITY
+                </span>
+            </div>
+        </div>
+
+        <!-- Metrics Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-label">Total Scheduled Jobs</span>
+                <span class="stat-value" th:text="${totalCount}">0</span>
+            </div>
+            
+            <div class="stat-card running">
+                <span class="stat-label">Pending / Running</span>
+                <span class="stat-value" th:text="${pendingCount + runningCount}">0</span>
+                <div class="stat-pulse pulse-indigo" th:if="${runningCount > 0}"></div>
+            </div>
+            
+            <div class="stat-card completed">
+                <span class="stat-label">Success Rates</span>
+                <span class="stat-value" th:text="${completedCount}">0</span>
+                <div class="stat-pulse pulse-green" th:if="${completedCount > 0}"></div>
+            </div>
+            
+            <div class="stat-card failed">
+                <span class="stat-label">Failed (Retrying)</span>
+                <span class="stat-value" th:text="${failedCount}">0</span>
+            </div>
+            
+            <div class="stat-card dead">
+                <span class="stat-label">Dead Letters (DLQ)</span>
+                <span class="stat-value" th:text="${deadCount}">0</span>
+                <div class="stat-pulse pulse-red" th:if="${deadCount > 0}"></div>
+            </div>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="table-controls">
+            <div class="filter-tabs">
+                <a href="/admin/async-jobs" class="filter-tab" th:classappend="${selectedStatus == null} ? 'active' : ''">All Jobs</a>
+                <a href="/admin/async-jobs?status=PENDING" class="filter-tab" th:classappend="${selectedStatus == 'PENDING'} ? 'active' : ''">Pending</a>
+                <a href="/admin/async-jobs?status=RUNNING" class="filter-tab" th:classappend="${selectedStatus == 'RUNNING'} ? 'active' : ''">Running</a>
+                <a href="/admin/async-jobs?status=COMPLETED" class="filter-tab" th:classappend="${selectedStatus == 'COMPLETED'} ? 'active' : ''">Completed</a>
+                <a href="/admin/async-jobs?status=FAILED" class="filter-tab" th:classappend="${selectedStatus == 'FAILED'} ? 'active' : ''">Failed</a>
+                <a href="/admin/async-jobs?status=DEAD" class="filter-tab" th:classappend="${selectedStatus == 'DEAD'} ? 'active' : ''">Dead Letter (DLQ)</a>
+            </div>
+            <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+                Active DLQ Threshold Limit: <strong th:text="${alertThreshold}" style="color: var(--text-primary)">10</strong>
+            </div>
+        </div>
+
+        <!-- Jobs Table -->
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Job ID</th>
+                        <th>Job Type</th>
+                        <th>User Context</th>
+                        <th>Invoice Context</th>
+                        <th>Attempts</th>
+                        <th>Last Error</th>
+                        <th>Scheduled Next Run</th>
+                        <th>Status</th>
+                        <th style="text-align: right;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Thymeleaf list iterator -->
+                    <tr th:each="job : ${jobs}">
+                        <td>
+                            <span style="font-family: monospace; font-size: 0.75rem;" th:text="${job.jobId}">
+                                49afc317-43a7-4139-b69b-f0f182a43843
+                            </span>
+                        </td>
+                        <td>
+                            <span class="type-badge" th:text="${job.jobType}">EMAIL</span>
+                        </td>
+                        <td>
+                            <span th:text="${job.user != null ? job.user.email : 'N/A'}">admin@mybill.local</span>
+                        </td>
+                        <td>
+                            <span th:text="${job.invoiceId != null ? job.invoiceId : 'N/A'}">N/A</span>
+                        </td>
+                        <td>
+                            <span th:text="${job.attemptCount + '/' + job.maxAttempts}">0/5</span>
+                        </td>
+                        <td>
+                            <div class="error-text" th:if="${job.lastError != null}" th:title="${job.lastError}" th:text="${job.lastError}">
+                                Connection refused
+                            </div>
+                            <span th:if="${job.lastError == null}" style="color: var(--text-secondary)">None</span>
+                        </td>
+                        <td th:text="${#temporals.format(job.nextRunAt, 'yyyy-MM-dd HH:mm:ss')}">
+                            2026-07-09 23:30:00
+                        </td>
+                        <td>
+                            <span class="badge" 
+                                  th:classappend="${job.status == 'PENDING' ? 'badge-pending' : 
+                                                   job.status == 'RUNNING' ? 'badge-running' : 
+                                                   job.status == 'COMPLETED' ? 'badge-completed' : 
+                                                   job.status == 'FAILED' ? 'badge-failed' : 'badge-dead'}"
+                                  th:text="${job.status}">
+                                PENDING
+                            </span>
+                        </td>
+                        <td style="text-align: right;">
+                            <!-- Show retry button only for non-completed jobs -->
+                            <button th:if="${job.status != 'COMPLETED'}" 
+                                    th:onclick="'retryJob(\'' + ${job.jobId} + '\')'" 
+                                    th:id="'btn-retry-' + ${job.jobId}"
+                                    class="btn btn-retry">
+                                Retry Now
+                            </button>
+                            <span th:if="${job.status == 'COMPLETED'}" style="color: var(--success); font-weight: 500; font-size: 0.8125rem;">
+                                Done ✓
+                            </span>
+                        </td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(jobs)}">
+                        <td colspan="9">
+                            <div class="empty-state">
+                                <h3>No scheduled jobs found</h3>
+                                <p>There are no jobs matching the selected state filter.</p>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast">
+        <div>
+            <div id="toast-title" class="toast-title">Success</div>
+            <div id="toast-body" class="toast-body">Job state reset successfully.</div>
+        </div>
+    </div>
+
+    <script>
+        function showToast(title, message, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastTitle = document.getElementById('toast-title');
+            const toastBody = document.getElementById('toast-body');
+            
+            toastTitle.textContent = title;
+            toastBody.textContent = message;
+            
+            if (isError) {
+                toast.style.borderLeftColor = 'var(--danger)';
+            } else {
+                toast.style.borderLeftColor = 'var(--success)';
+            }
+            
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        function retryJob(jobId) {
+            const button = document.getElementById('btn-retry-' + jobId);
+            if (button) {
+                button.disabled = true;
+                button.textContent = 'Queuing...';
+            }
+            
+            fetch('/api/admin/async-jobs/' + jobId + '/retry', {
+                method: 'POST'
+            })
+            .then(response => {
+                if (response.ok) {
+                    showToast('Success', 'Async Job has been reset to PENDING and will execute shortly.');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    return response.text().then(text => { throw new Error(text); });
+                }
+            })
+            .catch(error => {
+                showToast('Error', 'Failed to retry job: ' + error.message, true);
+                if (button) {
+                    button.disabled = false;
+                    button.textContent = 'Retry Now';
+                }
+            });
+        }
+    </script>
+</body>
+</html>

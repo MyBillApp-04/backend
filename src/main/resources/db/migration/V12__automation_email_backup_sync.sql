@@ -60,23 +60,26 @@ CREATE INDEX IF NOT EXISTS idx_email_logs_next_retry ON public.email_logs(next_r
 CREATE INDEX IF NOT EXISTS idx_backup_jobs_user_created ON public.backup_jobs(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_sync_device_user_device ON public.sync_device_state(user_id, device_id);
 
-INSERT INTO public.email_templates(template_type, subject, html_body)
+INSERT INTO public.email_templates(template_type, subject, html_body, is_deleted)
 SELECT 'INVOICE', 'Invoice {{invoiceNumber}} from MyBill',
-       '<p>Hello {{clientName}},</p><p>Your invoice <strong>{{invoiceNumber}}</strong> for {{totalAmount}} is attached.</p>'
+       '<p>Hello {{clientName}},</p><p>Your invoice <strong>{{invoiceNumber}}</strong> for {{totalAmount}} is attached.</p>',
+       false
 WHERE NOT EXISTS (
     SELECT 1 FROM public.email_templates WHERE user_id IS NULL AND template_type = 'INVOICE'
 );
 
-INSERT INTO public.email_templates(template_type, subject, html_body)
+INSERT INTO public.email_templates(template_type, subject, html_body, is_deleted)
 SELECT 'REMINDER', 'Payment reminder for invoice {{invoiceNumber}}',
-       '<p>Hello {{clientName}},</p><p>This is a reminder that invoice <strong>{{invoiceNumber}}</strong> has {{remainingAmount}} remaining.</p>'
+       '<p>Hello {{clientName}},</p><p>This is a reminder that invoice <strong>{{invoiceNumber}}</strong> has {{remainingAmount}} remaining.</p>',
+       false
 WHERE NOT EXISTS (
     SELECT 1 FROM public.email_templates WHERE user_id IS NULL AND template_type = 'REMINDER'
 );
 
-INSERT INTO public.email_templates(template_type, subject, html_body)
+INSERT INTO public.email_templates(template_type, subject, html_body, is_deleted)
 SELECT 'WELCOME', 'Welcome to MyBill',
-       '<p>Hello {{name}},</p><p>Welcome to MyBill.</p>'
+       '<p>Hello {{name}},</p><p>Welcome to MyBill.</p>',
+       false
 WHERE NOT EXISTS (
     SELECT 1 FROM public.email_templates WHERE user_id IS NULL AND template_type = 'WELCOME'
 );

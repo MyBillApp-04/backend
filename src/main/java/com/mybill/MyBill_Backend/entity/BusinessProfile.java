@@ -2,6 +2,8 @@ package com.mybill.MyBill_Backend.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Pattern;
 import lombok.*;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.LastModifiedBy;
@@ -37,10 +39,18 @@ public class BusinessProfile {
     private String businessName;
     private String ownerName;
     private String address;
+
+    @Pattern(regexp = "^$|^[0-9]{10}$", message = "Phone must be a 10-digit number")
     private String phone;
+
+    @Email(message = "Email must be valid")
     private String email;
 
     // Compliance
+    @Pattern(
+            regexp = "^$|^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$",
+            message = "GSTIN must be valid"
+    )
     private String gstin;
 
     // Bank / payment details

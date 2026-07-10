@@ -85,9 +85,11 @@ public class ClientController {
     public List<ClientResponse> getClientsUpdatedSince(
             @RequestParam
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            LocalDateTime since
+            LocalDateTime since,
+            Pageable pageable
     ) {
-        return clientService.getClientsUpdatedSince(since)
+        return clientService.getClientsUpdatedSince(since, pageable)
+                .getContent()
                 .stream()
                 .map(ClientResponse::new)
                 .toList();

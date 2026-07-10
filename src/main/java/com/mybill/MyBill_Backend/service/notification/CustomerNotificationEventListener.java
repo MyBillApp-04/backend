@@ -38,13 +38,17 @@ public class CustomerNotificationEventListener {
         context.put("remainingAmount", invoice.getRemainingAmount());
         context.put("paymentStatus", invoice.getPaymentStatus().name());
 
-        notificationService.processAndSendNotification(
-                invoice.getUser(),
-                invoice.getClient(),
-                invoice,
-                "INVOICE_GENERATED",
-                context
-        );
+        try {
+            notificationService.processAndSendNotification(
+                    invoice.getUser(),
+                    invoice.getClient(),
+                    invoice,
+                    "INVOICE_GENERATED",
+                    context
+            );
+        } catch (Exception e) {
+            log.error("Failed to send customer notification for invoice creation: ID={}. Continuing gracefully.", invoice.getId(), e);
+        }
     }
 
     @Async
@@ -58,13 +62,17 @@ public class CustomerNotificationEventListener {
         context.put("remainingAmount", invoice.getRemainingAmount());
         context.put("paymentStatus", invoice.getPaymentStatus().name());
 
-        notificationService.processAndSendNotification(
-                invoice.getUser(),
-                invoice.getClient(),
-                invoice,
-                "INVOICE_UPDATED",
-                context
-        );
+        try {
+            notificationService.processAndSendNotification(
+                    invoice.getUser(),
+                    invoice.getClient(),
+                    invoice,
+                    "INVOICE_UPDATED",
+                    context
+            );
+        } catch (Exception e) {
+            log.error("Failed to send customer notification for invoice update: ID={}. Continuing gracefully.", invoice.getId(), e);
+        }
     }
 
     @Async
@@ -79,13 +87,17 @@ public class CustomerNotificationEventListener {
 
         String type = event.getRemainingAmount() <= 0 ? "PAYMENT_RECEIVED" : "PARTIAL_PAYMENT";
 
-        notificationService.processAndSendNotification(
-                event.getPayment().getUser(),
-                event.getPayment().getClient(),
-                invoice,
-                type,
-                context
-        );
+        try {
+            notificationService.processAndSendNotification(
+                    event.getPayment().getUser(),
+                    event.getPayment().getClient(),
+                    invoice,
+                    type,
+                    context
+            );
+        } catch (Exception e) {
+            log.error("Failed to send customer notification for payment recorded: invoice ID={}. Continuing gracefully.", invoice.getId(), e);
+        }
     }
 
     @Async
@@ -96,12 +108,16 @@ public class CustomerNotificationEventListener {
         Map<String, Object> context = new HashMap<>();
         context.put("advanceAmount", event.getAdvanceAmount());
 
-        notificationService.processAndSendNotification(
-                event.getUser(),
-                event.getClient(),
-                null,
-                "ADVANCE_BALANCE",
-                context
-        );
+        try {
+            notificationService.processAndSendNotification(
+                    event.getUser(),
+                    event.getClient(),
+                    null,
+                    "ADVANCE_BALANCE",
+                    context
+            );
+        } catch (Exception e) {
+            log.error("Failed to send customer notification for advance balance availability. Continuing gracefully.", e);
+        }
     }
 }

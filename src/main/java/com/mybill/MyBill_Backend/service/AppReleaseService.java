@@ -8,6 +8,7 @@ import com.mybill.MyBill_Backend.entity.Role;
 import com.mybill.MyBill_Backend.repository.AppReleaseRepository;
 import com.mybill.MyBill_Backend.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,7 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class AppReleaseService {
     private final AppReleaseRepository repository;
     private final SecurityUtils securityUtils;
@@ -65,7 +67,7 @@ public class AppReleaseService {
             repository.saveAndFlush(active);
         });
 
-        return repository.save(AppRelease.builder()
+        AppRelease release = repository.save(AppRelease.builder()
                 .versionCode(request.versionCode())
                 .versionName(request.versionName().trim())
                 .minimumSupportedVersionCode(request.minimumSupportedVersionCode())
@@ -80,6 +82,9 @@ public class AppReleaseService {
                 .active(true)
                 .publishedAt(OffsetDateTime.now())
                 .build());
+        log.info("app_release_published versionCode={} versionName={} updateType={}",
+                release.getVersionCode(), release.getVersionName(), release.getUpdateType());
+        return release;
     }
 
     AppUpdateType decideUpdateType(AppRelease release, Integer currentVersionCode) {

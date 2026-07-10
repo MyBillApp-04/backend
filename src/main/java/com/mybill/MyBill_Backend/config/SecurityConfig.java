@@ -2,10 +2,13 @@ package com.mybill.MyBill_Backend.config;
 
 import com.mybill.MyBill_Backend.security.JwtAuthenticationFilter;
 import com.mybill.MyBill_Backend.security.RateLimitFilter;
+import com.mybill.MyBill_Backend.observability.RequestCorrelationFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -32,6 +35,9 @@ public class SecurityConfig {
     @Value("${app.allowed-origins:}")
     private String allowedOrigins;
 
+    @Value("${app.security.require-https:false}")
+    private boolean requireHttps;
+
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter,
             RateLimitFilter rateLimitFilter,
@@ -42,8 +48,19 @@ public class SecurityConfig {
         this.environment = environment;
     }
 
+    /**
+     * Builds the stateless API security chain.
+     *
+     * @param http Spring Security HTTP configuration
+     * @return configured filter chain
+     * @throws Exception when the chain cannot be constructed
+     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        if (requireHttps) {
+            http.requiresChannel(channel -> channel.anyRequest().requiresSecure());
+        }
+
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -77,15 +94,29 @@ public class SecurityConfig {
                         // Public: update checks work before/after login; Image.network shows logo without Auth.
                         .requestMatchers(HttpMethod.GET, "/api/app-version").permitAll()
                         .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
+                        .requestMatchers("/admin/**", "/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(rateLimitFilter, JwtAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
+    @Bean
+    public FilterRegistrationBean<RateLimitFilter> rateLimitFilterRegistration() {
+        FilterRegistrationBean<RateLimitFilter> registration =
+                new FilterRegistrationBean<>(rateLimitFilter);
+        registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
+        registration.addUrlPatterns("/*");
+        return registration;
+    }
+
+    /**
+     * Defines browser origins, methods, headers, and request-ID visibility.
+     *
+     * @return CORS configuration applied to every route
+     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
@@ -99,10 +130,9 @@ public class SecurityConfig {
                     .map(this::normalizeOriginPattern)
                     .filter(origin -> !origin.isBlank())
                     .toList());
-            // Flutter Web debug builds use the cloud backend from random local
-            // ports. Keep loopback origins available even when Render supplies
-            // an explicit ALLOWED_ORIGINS value.
-            addLocalDevPatterns(origins);
+            if (isDevProfile()) {
+                addLocalDevPatterns(origins);
+            }
             if (origins.stream().anyMatch(origin -> origin.contains("*"))) {
                 config.setAllowedOriginPatterns(origins);
             } else {
@@ -118,6 +148,7 @@ public class SecurityConfig {
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         config.setAllowedHeaders(List.of("*"));
+        config.setExposedHeaders(List.of(RequestCorrelationFilter.REQUEST_ID_HEADER));
         config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
