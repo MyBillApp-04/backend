@@ -41,7 +41,7 @@ public class Payment {
     @JsonIgnore
     private User user;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "double precision")
     private Double amount;
 
     @Enumerated(EnumType.STRING)
@@ -58,6 +58,7 @@ public class Payment {
     private String stripeChargeId;
     private String stripeRefundId;
     private String stripeStatus;
+    @Column(columnDefinition = "double precision")
     private Double refundedAmount;
 
     @Builder.Default

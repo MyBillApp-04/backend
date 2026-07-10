@@ -39,6 +39,30 @@ class GlobalExceptionHandlerTest {
                 .andExpect(content().string(containsString("timestamp")));
     }
 
+    @Test
+    void incrementsMeterRegistryOnError() throws Exception {
+        io.micrometer.core.instrument.MeterRegistry mockRegistry = org.mockito.Mockito.mock(io.micrometer.core.instrument.MeterRegistry.class);
+        io.micrometer.core.instrument.Counter mockCounter = org.mockito.Mockito.mock(io.micrometer.core.instrument.Counter.class);
+
+        org.mockito.Mockito.when(mockRegistry.counter(
+                org.mockito.Mockito.eq("mybill.api.errors"),
+                org.mockito.Mockito.any(String[].class)
+        )).thenReturn(mockCounter);
+
+        GlobalExceptionHandler handler = new GlobalExceptionHandler();
+        org.springframework.test.util.ReflectionTestUtils.setField(handler, "meterRegistry", mockRegistry);
+
+        MockMvc mvc = MockMvcBuilders
+                .standaloneSetup(new BrokenController())
+                .setControllerAdvice(handler)
+                .build();
+
+        mvc.perform(get("/broken"))
+                .andExpect(status().isBadRequest());
+
+        org.mockito.Mockito.verify(mockCounter, org.mockito.Mockito.times(1)).increment();
+    }
+
     @RestController
     static class BrokenController {
         @GetMapping("/broken")

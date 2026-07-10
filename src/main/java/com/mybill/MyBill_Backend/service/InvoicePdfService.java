@@ -696,16 +696,15 @@ public class InvoicePdfService {
                     ? path.substring("uploads/".length())
                     : path;
 
-            java.nio.file.Path filePath = Paths.get(uploadDir).toAbsolutePath().resolve(filename);
+            java.nio.file.Path uploadsRoot = Paths.get(uploadDir).toAbsolutePath().normalize();
+            java.nio.file.Path filePath = uploadsRoot.resolve(filename).normalize();
 
-            if (Files.exists(filePath)) {
-                return Files.readAllBytes(filePath);
+            if (!filePath.startsWith(uploadsRoot) || !Files.isRegularFile(filePath)) {
+                return null;
             }
 
-            java.nio.file.Path abs = Paths.get(path);
-
-            if (Files.exists(abs)) {
-                return Files.readAllBytes(abs);
+            if (Files.isReadable(filePath)) {
+                return Files.readAllBytes(filePath);
             }
         } catch (Exception ignored) {
         }

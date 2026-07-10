@@ -99,16 +99,17 @@ public class ClientFinancialService {
         clientRepository.findByIdAndUserIdAndIsDeletedFalse(clientId, userId)
                 .orElseThrow(() -> new RuntimeException("Client not found or access denied"));
 
-        List<Invoice> invoices = invoiceRepository.findByClientIdAndUserIdAndIsDeletedFalse(clientId, userId);
-        double totalBilled = invoices.stream()
-                .mapToDouble(invoice -> firstNonNull(invoice.getGrossAmount(), invoice.getSubtotal(), invoice.getTotalAmount(), 0.0))
-                .sum();
-        double totalReceived = invoices.stream()
-                .mapToDouble(invoice -> firstNonNull(invoice.getPaidAmount(), 0.0))
-                .sum();
-        double outstanding = invoices.stream()
-                .mapToDouble(invoice -> firstNonNull(invoice.getPendingAmount(), invoice.getRemainingAmount(), 0.0))
-                .sum();
+        List<Object[]> statsList = invoiceRepository.getClientFinancialStats(clientId, userId);
+        double totalBilled = 0.0;
+        double totalReceived = 0.0;
+        double outstanding = 0.0;
+
+        if (statsList != null && !statsList.isEmpty() && statsList.get(0) != null) {
+            Object[] stats = statsList.get(0);
+            totalBilled = ((Number) stats[0]).doubleValue();
+            totalReceived = ((Number) stats[1]).doubleValue();
+            outstanding = ((Number) stats[2]).doubleValue();
+        }
         double advance = getAdvanceBalance(clientId, userId);
 
         return ClientFinancialSummaryDTO.builder()
@@ -135,7 +136,7 @@ public class ClientFinancialService {
         Client client = clientRepository.findByIdAndUserIdAndIsDeletedFalse(clientId, userId)
                 .orElseThrow(() -> new RuntimeException("Client not found or access denied"));
 
-        double amount = request.getAmount() != null ? request.getAmount() : 0.0;
+        double amount = request.getAmount() != null ? request.getAmount().doubleValue() : 0.0;
         if (amount <= 0) {
             throw new IllegalArgumentException("Payment amount must be greater than zero");
         }
@@ -156,19 +157,7 @@ public class ClientFinancialService {
         double remainingReceipt = amount;
         double appliedToInvoices = 0.0;
 
-        List<Invoice> pendingInvoices = invoiceRepository.findByClientIdAndUserIdAndIsDeletedFalse(clientId, userId)
-                .stream()
-                .filter(invoice -> firstNonNull(invoice.getPendingAmount(), invoice.getRemainingAmount(), 0.0) > 0)
-                .sorted(Comparator
-                        .comparing(
-                                (Invoice invoice) -> firstNonNullDate(
-                                        invoice.getDueDate(),
-                                        invoice.getInvoiceDate(),
-                                        invoice.getCreatedDate(),
-                                        LocalDateTime.MAX
-                                )
-                        ))
-                .toList();
+        List<Invoice> pendingInvoices = invoiceRepository.findPendingInvoicesByClient(clientId, userId);
 
         for (Invoice invoice : pendingInvoices) {
             if (remainingReceipt <= 0) break;

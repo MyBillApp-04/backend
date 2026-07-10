@@ -92,12 +92,35 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
                )
              END DESC,
              i.created_date DESC
-           """, nativeQuery = true)
-    List<Invoice> searchInvoices(
+           """,
+           countQuery = """
+           SELECT COUNT(*)
+           FROM public.invoice i
+           LEFT JOIN public.clients c ON c.id = i.client_id
+           WHERE i.user_id = :userId
+             AND COALESCE(i.is_deleted, false) = false
+             AND (:month IS NULL OR EXTRACT(MONTH FROM i.created_date) = :month)
+             AND (:year IS NULL OR EXTRACT(YEAR FROM i.created_date) = :year)
+             AND (
+                :clientName = ''
+                OR to_tsvector(
+                    'simple',
+                    COALESCE(i.invoice_number, '') || ' ' ||
+                    COALESCE(i.notes, '') || ' ' ||
+                    COALESCE(c.name, '') || ' ' ||
+                    COALESCE(c.phone, '')
+                ) @@ plainto_tsquery('simple', :clientName)
+                OR LOWER(COALESCE(c.name, '')) LIKE LOWER(CONCAT('%', :clientName, '%'))
+                OR LOWER(COALESCE(i.invoice_number, '')) LIKE LOWER(CONCAT('%', :clientName, '%'))
+             )
+           """,
+           nativeQuery = true)
+    Page<Invoice> searchInvoices(
             @Param("userId") Long userId,
             @Param("clientName") String clientName,
             @Param("month") Integer month,
-            @Param("year") Integer year
+            @Param("year") Integer year,
+            Pageable pageable
     );
 
     @Query(
@@ -248,4 +271,32 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
     );
 
     List<Invoice> findByIsDeletedFalseAndPaymentStatusIn(List<PaymentStatus> statuses);
+
+    @Query("""
+           SELECT 
+             COALESCE(SUM(COALESCE(i.grossAmount, COALESCE(i.subtotal, COALESCE(i.totalAmount, 0.0)))), 0.0),
+             COALESCE(SUM(COALESCE(i.paidAmount, 0.0)), 0.0),
+             COALESCE(SUM(COALESCE(i.pendingAmount, COALESCE(i.remainingAmount, 0.0))), 0.0)
+           FROM Invoice i
+           WHERE i.client.id = :clientId
+             AND i.user.id = :userId
+             AND i.isDeleted = false
+           """)
+    List<Object[]> getClientFinancialStats(
+            @Param("clientId") java.util.UUID clientId,
+            @Param("userId") Long userId
+    );
+
+    @Query("""
+           SELECT i FROM Invoice i
+           WHERE i.client.id = :clientId
+             AND i.user.id = :userId
+             AND i.isDeleted = false
+             AND COALESCE(i.pendingAmount, COALESCE(i.remainingAmount, 0.0)) > 0
+           ORDER BY COALESCE(i.dueDate, COALESCE(i.invoiceDate, COALESCE(i.createdDate, '9999-12-31 23:59:59'))) ASC
+           """)
+    List<Invoice> findPendingInvoicesByClient(
+            @Param("clientId") java.util.UUID clientId,
+            @Param("userId") Long userId
+    );
 }

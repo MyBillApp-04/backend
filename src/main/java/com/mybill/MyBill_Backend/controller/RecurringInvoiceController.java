@@ -3,6 +3,7 @@ package com.mybill.MyBill_Backend.controller;
 import com.mybill.MyBill_Backend.dto.RecurringInvoiceScheduleDTO;
 import com.mybill.MyBill_Backend.entity.RecurringInvoiceSchedule;
 import com.mybill.MyBill_Backend.service.RecurringInvoiceScheduleService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,7 +36,7 @@ public class RecurringInvoiceController {
 
     @PostMapping
     public ResponseEntity<RecurringInvoiceScheduleDTO> createSchedule(
-            @RequestBody RecurringInvoiceScheduleDTO dto
+            @Valid @RequestBody RecurringInvoiceScheduleDTO dto
     ) {
         RecurringInvoiceSchedule created = scheduleService.createSchedule(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(toDTO(created));
@@ -44,7 +45,7 @@ public class RecurringInvoiceController {
     @PutMapping("/{id}")
     public ResponseEntity<RecurringInvoiceScheduleDTO> updateSchedule(
             @PathVariable UUID id,
-            @RequestBody RecurringInvoiceScheduleDTO dto
+            @Valid @RequestBody RecurringInvoiceScheduleDTO dto
     ) {
         RecurringInvoiceSchedule updated = scheduleService.updateSchedule(id, dto);
         return ResponseEntity.ok(toDTO(updated));

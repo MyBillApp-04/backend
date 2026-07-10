@@ -37,12 +37,14 @@ public class ClientWork {
 
     @NotNull(message = "Rate is required")
     @Positive(message = "Rate must be positive")
+    @Column(columnDefinition = "double precision")
     private Double rate;
 
     @NotNull(message = "Quantity is required")
     @Positive(message = "Quantity must be positive")
     private Integer quantity;
 
+    @Column(columnDefinition = "double precision")
     private Double amount;
 
     @PastOrPresent(message = "Date cannot be in the future")

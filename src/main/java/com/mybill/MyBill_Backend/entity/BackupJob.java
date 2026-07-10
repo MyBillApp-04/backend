@@ -35,6 +35,9 @@ public class BackupJob {
 
     private String location;
 
+    @Column(length = 64)
+    private String sha256;
+
     @Column(columnDefinition = "text")
     private String errorMessage;
 

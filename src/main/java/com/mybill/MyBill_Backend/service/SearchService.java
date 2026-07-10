@@ -9,6 +9,7 @@ import com.mybill.MyBill_Backend.repository.ClientWorkRepository;
 import com.mybill.MyBill_Backend.repository.InvoiceRepository;
 import com.mybill.MyBill_Backend.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,9 +30,10 @@ public class SearchService {
     public GlobalSearchResponse globalSearch(String query, Pageable pageable) {
         Long userId = securityUtils.getCurrentUserId();
         String safeQuery = query == null ? "" : query.trim();
+        Pageable boundedPageable = boundedSearchPageable(pageable);
 
         return GlobalSearchResponse.builder()
-                .clients(clientRepository.searchProjectedByUserIdAndQuery(userId, safeQuery, pageable)
+                .clients(clientRepository.searchProjectedByUserIdAndQuery(userId, safeQuery, boundedPageable)
                         .map(client -> {
                             Map<String, Object> m = new LinkedHashMap<>();
                             m.put("id", client.getId());
@@ -40,15 +42,22 @@ public class SearchService {
                             return m;
                         })
                         .toList())
-                .works(workRepository.searchByUserIdAndQuery(userId, safeQuery, pageable)
+                .works(workRepository.searchByUserIdAndQuery(userId, safeQuery, boundedPageable)
                         .map(this::workToMap)
                         .toList())
-                .invoices(invoiceRepository.searchInvoices(userId, safeQuery, null, null)
-                        .stream()
-                        .limit(pageable.getPageSize())
+                .invoices(invoiceRepository.searchInvoices(userId, safeQuery, null, null, boundedPageable)
                         .map(this::invoiceToMap)
                         .toList())
                 .build();
+    }
+
+    private Pageable boundedSearchPageable(Pageable pageable) {
+        if (pageable == null || pageable.isUnpaged()) {
+            return PageRequest.of(0, 8);
+        }
+
+        int size = Math.min(pageable.getPageSize(), 25);
+        return PageRequest.of(pageable.getPageNumber(), size, pageable.getSort());
     }
 
     private Map<String, Object> workToMap(ClientWork work) {

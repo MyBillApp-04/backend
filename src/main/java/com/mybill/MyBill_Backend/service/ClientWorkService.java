@@ -148,13 +148,11 @@ public class ClientWorkService {
     }
 
     @Transactional(readOnly = true)
-    public List<ClientWorkDTO> getWorkUpdatedSince(LocalDateTime since) {
+    public org.springframework.data.domain.Page<ClientWorkDTO> getWorkUpdatedSince(LocalDateTime since, org.springframework.data.domain.Pageable pageable) {
         Long userId = securityUtils.getCurrentUserId();
 
-        return workRepository.findByUserIdAndUpdatedAtAfter(userId, since)
-                .stream()
-                .map(this::convertToDTO)
-                .toList();
+        return workRepository.findByUserIdAndUpdatedAtAfter(userId, since, pageable)
+                .map(this::convertToDTO);
     }
 
     private Double calculateAmount(Double rate, Integer quantity) {

@@ -5,3 +5,8 @@ target
 .codex
 uploads
 *.log
+.env
+.env.*
+!.env.example
+coverage
+docs

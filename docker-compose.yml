@@ -17,10 +17,13 @@ services:
       retries: 5
 
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: mybill-backend
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       SPRING_PROFILES_ACTIVE: dev
       DB_URL: jdbc:postgresql://postgres:5432/mybill
@@ -30,6 +33,15 @@ services:
       PORT: 8080
     ports:
       - "8080:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - app-uploads:/app/uploads
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,3 +75,4 @@ services:
 volumes:
   postgres-data:
   grafana-data:
+  app-uploads:

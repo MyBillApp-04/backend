@@ -28,7 +28,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private static final Set<String> AUTH_PATHS = Set.of(
-            "/api/auth/firebase-login"
+            "/api/auth/firebase-login",
+            "/api/auth/login",
+            "/api/auth/register",
+            "/auth/login",
+            "/auth/register",
+            "/api/login",
+            "/api/register",
+            "/login",
+            "/register"
     );
 
     private final SecurityUtils securityUtils;

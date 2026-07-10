@@ -104,10 +104,11 @@ public class ClientService {
     }
 
     @Transactional(readOnly = true)
-    public List<Client> getClientsUpdatedSince(LocalDateTime since) {
+    public org.springframework.data.domain.Page<Client> getClientsUpdatedSince(LocalDateTime since, org.springframework.data.domain.Pageable pageable) {
         return clientRepository.findByUserIdAndUpdatedAtAfter(
                 securityUtils.getCurrentUserId(),
-                since
+                since,
+                pageable
         );
     }
 

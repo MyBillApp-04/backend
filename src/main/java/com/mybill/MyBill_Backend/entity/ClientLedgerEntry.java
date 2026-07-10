@@ -52,10 +52,10 @@ public class ClientLedgerEntry {
     @Column(nullable = false)
     private LedgerDirection direction;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "double precision")
     private Double amount;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "double precision")
     private Double balanceAfter;
 
     @Column(columnDefinition = "text")

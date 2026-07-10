@@ -7,6 +7,8 @@ import com.mybill.MyBill_Backend.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 
 @Service
 @RequiredArgsConstructor
@@ -15,12 +17,14 @@ public class BusinessProfileService {
     private final BusinessProfileRepository repository;
     private final SecurityUtils securityUtils;
 
+    @Cacheable(value = "businessProfiles", key = "@securityUtils.getCurrentUserId()")
     public BusinessProfile getProfile() {
         Long userId = securityUtils.getCurrentUserId();
         return repository.findByUserId(userId).orElse(null);
     }
 
     @Transactional
+    @CacheEvict(value = "businessProfiles", key = "@securityUtils.getCurrentUserId()")
     public BusinessProfile saveOrUpdateProfile(BusinessProfile profile) {
         Long userId = securityUtils.getCurrentUserId();
         User user = securityUtils.getCurrentUser();
@@ -65,16 +69,19 @@ public class BusinessProfileService {
     }
 
     @Transactional
+    @CacheEvict(value = "businessProfiles", key = "@securityUtils.getCurrentUserId()")
     public BusinessProfile updateLogoPath(String path) {
         return updateImagePath(path, ImageField.LOGO);
     }
 
     @Transactional
+    @CacheEvict(value = "businessProfiles", key = "@securityUtils.getCurrentUserId()")
     public BusinessProfile updateQrImagePath(String path) {
         return updateImagePath(path, ImageField.QR);
     }
 
     @Transactional
+    @CacheEvict(value = "businessProfiles", key = "@securityUtils.getCurrentUserId()")
     public BusinessProfile updateSignaturePath(String path) {
         return updateImagePath(path, ImageField.SIGNATURE);
     }

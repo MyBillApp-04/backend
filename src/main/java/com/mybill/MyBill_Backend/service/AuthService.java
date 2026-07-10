@@ -50,6 +50,6 @@ public class AuthService {
             user = userRepository.save(user);
         }
 
-        return jwtUtil.generateToken(user.getEmail());
+        return jwtUtil.generateToken(user.getEmail(), user.getRole());
     }
 }

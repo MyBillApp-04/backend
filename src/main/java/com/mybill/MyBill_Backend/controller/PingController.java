@@ -8,23 +8,19 @@ import java.time.Instant;
 import java.util.Map;
 
 /**
- * Public health-check endpoint for UptimeRobot.
+ * Public liveness API used by uptime monitoring and performance smoke tests.
  *
- * Configure UptimeRobot to monitor:
- *   URL  : https://mybill-backend-vckc.onrender.com/ping
- *   Type : HTTP(s)
- *   Interval: 5 minutes
- *
- * This keeps the Render free-tier instance warm so it never cold-starts
- * during normal business hours. UptimeRobot pings every 5 minutes;
- * Render sleeps after 15 minutes of inactivity — so 5-minute pings
- * guarantee the server is always awake.
- *
- * No authentication required — SecurityConfig explicitly permits /ping.
+ * <p>No authentication is required. A successful response indicates that the
+ * web process can serve requests; it does not guarantee database readiness.</p>
  */
 @RestController
 public class PingController {
 
+    /**
+     * Returns process liveness and the server timestamp.
+     *
+     * @return HTTP 200 with status, service name, and ISO-8601 timestamp
+     */
     @GetMapping("/ping")
     public ResponseEntity<Map<String, Object>> ping() {
         return ResponseEntity.ok(Map.of(

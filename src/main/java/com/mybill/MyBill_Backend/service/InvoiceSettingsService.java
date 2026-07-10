@@ -7,6 +7,8 @@ import com.mybill.MyBill_Backend.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 
 import java.util.UUID;
 
@@ -19,11 +21,13 @@ public class InvoiceSettingsService {
     private final SecurityUtils securityUtils;
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "invoiceSettings", key = "@securityUtils.getCurrentUserId()")
     public InvoiceSettings getSettings() {
         Long userId = securityUtils.getCurrentUserId();
         return repository.findByUserId(userId).orElseGet(this::createDefaultSettings);
     }
 
+    @CacheEvict(value = "invoiceSettings", key = "@securityUtils.getCurrentUserId()")
     public InvoiceSettings saveOrUpdateSettings(InvoiceSettings incoming) {
         Long userId = securityUtils.getCurrentUserId();
         User user = securityUtils.getCurrentUser();

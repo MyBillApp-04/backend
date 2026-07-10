@@ -8,6 +8,11 @@ import com.mybill.MyBill_Backend.entity.Invoice;
 import com.mybill.MyBill_Backend.entity.PaymentMode;
 import com.mybill.MyBill_Backend.service.InvoicePdfService;
 import com.mybill.MyBill_Backend.service.InvoiceService;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PastOrPresent;
+import jakarta.validation.Valid;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -33,7 +38,7 @@ public class InvoiceController {
     private final InvoicePdfService invoicePdfService;
 
     @PostMapping("/generate")
-    public ResponseEntity<Invoice> generateInvoice(@RequestBody InvoiceRequest request) {
+    public ResponseEntity<Invoice> generateInvoice(@Valid @RequestBody InvoiceRequest request) {
         Invoice invoice = invoiceService.generateInvoice(
                 request.getClientId(),
                 request.getWorkIds(),
@@ -48,7 +53,7 @@ public class InvoiceController {
     @PatchMapping("/{invoiceId}/payment")
     public ResponseEntity<Invoice> updatePayment(
             @PathVariable UUID invoiceId,
-            @RequestBody PaymentUpdateRequest request
+            @Valid @RequestBody PaymentUpdateRequest request
     ) {
         Invoice updatedInvoice = invoiceService.updatePayment(
                 invoiceId,
@@ -101,7 +106,7 @@ public class InvoiceController {
     }
 
     @PostMapping("/preview")
-    public ResponseEntity<InvoicePreview> preview(@RequestBody InvoiceRequest request) {
+    public ResponseEntity<InvoicePreview> preview(@Valid @RequestBody InvoiceRequest request) {
         InvoicePreview preview = invoiceService.previewInvoice(
                 request.getClientId(),
                 request.getWorkIds()
@@ -114,9 +119,10 @@ public class InvoiceController {
     public ResponseEntity<List<Invoice>> getInvoicesUpdatedSince(
             @RequestParam
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            LocalDateTime since
+            LocalDateTime since,
+            org.springframework.data.domain.Pageable pageable
     ) {
-        return ResponseEntity.ok(invoiceService.getInvoicesUpdatedSince(since));
+        return ResponseEntity.ok(invoiceService.getInvoicesUpdatedSince(since, pageable).getContent());
     }
 
     @DeleteMapping("/{invoiceId}")
@@ -173,8 +179,16 @@ public class InvoiceController {
     @Data
     public static class PaymentUpdateRequest {
         private String status;
+
+        @NotNull(message = "Paid amount is required")
+        @DecimalMin(value = "0.00", message = "Paid amount cannot be negative")
+        @Digits(integer = 12, fraction = 2, message = "Paid amount can have at most 2 decimal places")
         private Double paidAmount;
+
+        @NotNull(message = "Payment mode is required")
         private PaymentMode paymentMode;
+
+        @PastOrPresent(message = "Payment date cannot be in the future")
         private LocalDateTime paymentDate;
     }
 }

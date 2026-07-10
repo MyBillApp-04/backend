@@ -3,6 +3,7 @@ package com.mybill.MyBill_Backend.controller;
 import com.mybill.MyBill_Backend.entity.BusinessProfile;
 import com.mybill.MyBill_Backend.exception.UploadException;
 import com.mybill.MyBill_Backend.service.BusinessProfileService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,7 +52,7 @@ public class BusinessProfileController {
     }
 
     @PostMapping
-    public ResponseEntity<BusinessProfile> saveOrUpdateProfile(@RequestBody BusinessProfile profile) {
+    public ResponseEntity<BusinessProfile> saveOrUpdateProfile(@Valid @RequestBody BusinessProfile profile) {
         return ResponseEntity.ok(service.saveOrUpdateProfile(profile));
     }
 

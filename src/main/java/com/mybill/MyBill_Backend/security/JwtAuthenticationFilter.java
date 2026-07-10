@@ -10,11 +10,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.LinkedHashSet;
 
 @Component
 @RequiredArgsConstructor
@@ -24,6 +25,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
+    private final JwtTokenDenylist tokenDenylist;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -47,7 +49,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String header = request.getHeader("Authorization");
 
         if (log.isDebugEnabled()) {
-            log.debug("Auth Header: {}", header != null ? "Present (Starts with " + header.substring(0, Math.min(header.length(), 10)) + "...)" : "NULL");
+            log.debug("Authorization header present: {}", header != null);
         }
 
         if (header == null || !header.startsWith("Bearer ")) {
@@ -59,11 +61,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = header.substring(7);
 
         try {
+            if (tokenDenylist.isDenied(token)) {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token has been logged out");
+                return;
+            }
+
             if (jwtUtil.validateToken(token)) {
                 String email = jwtUtil.extractEmail(token);
                 if (log.isDebugEnabled()) {
                     log.debug("Token Status: VALID");
-                    log.debug("Extracted Email: {}", email);
                 }
 
                 if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -75,14 +81,34 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "User account no longer exists");
                         return;
                     }
+                    var user = userOpt.get();
+                    String expectedRole = JwtUtil.authorityFor(user.getRole());
+                    String tokenRole = jwtUtil.extractRole(token);
+
+                    if (!expectedRole.equals(tokenRole)) {
+                        if (log.isWarnEnabled()) {
+                            log.warn("Action: Token role does not match persisted role for {}. Rejecting request.", email);
+                        }
+                        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token role is no longer valid");
+                        return;
+                    }
+
                     if (log.isDebugEnabled()) log.debug("Action: User exists in DB. Proceeding with authentication.");
 
+                    var authorities = new LinkedHashSet<SimpleGrantedAuthority>();
+                    jwtUtil.extractAuthorities(token).stream()
+                            .map(SimpleGrantedAuthority::new)
+                            .forEach(authorities::add);
+                    jwtUtil.extractScopes(token).stream()
+                            .map(scope -> new SimpleGrantedAuthority("SCOPE_" + scope))
+                            .forEach(authorities::add);
+
                     UsernamePasswordAuthenticationToken authToken =
-                            new UsernamePasswordAuthenticationToken(email, null, new ArrayList<>());
+                            new UsernamePasswordAuthenticationToken(email, null, authorities);
 
                     // Auditing must obtain the user id without issuing a query
                     // during Hibernate's flush lifecycle. See AuditingConfig.
-                    authToken.setDetails(userOpt.get().getId());
+                    authToken.setDetails(user.getId());
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                     if (log.isDebugEnabled()) log.debug("Action: Successfully authenticated user in SecurityContext.");
                 }

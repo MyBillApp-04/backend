@@ -1,21 +1,22 @@
-FROM maven:3.9.6-eclipse-temurin-17 AS build
+FROM maven:3.9.9-eclipse-temurin-17 AS build
 WORKDIR /workspace
-COPY . .
-RUN mvn clean package -DskipTests
+COPY pom.xml .
+RUN mvn -B -DskipTests dependency:go-offline
+COPY src ./src
+RUN mvn -B -DskipTests package \
+    && mkdir -p /runtime/uploads
 
-FROM eclipse-temurin:17-jre
+FROM gcr.io/distroless/java17-debian12:nonroot
 WORKDIR /app
 
 ENV TZ=Asia/Kolkata
 ENV APP_TIME_ZONE=Asia/Kolkata
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/urandom"
 
-RUN groupadd -r spring && useradd -r -g spring spring \
-    && mkdir -p /app/uploads \
-    && chown -R spring:spring /app
+COPY --from=build --chown=nonroot:nonroot /workspace/target/MyBill_Backend-1.0.0.jar /app/app.jar
+COPY --from=build --chown=nonroot:nonroot /runtime/uploads /app/uploads
 
-COPY --from=build --chown=spring:spring /workspace/target/MyBill_Backend-1.0.0.jar app.jar
-
-USER spring:spring
+USER nonroot:nonroot
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

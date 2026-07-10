@@ -8,6 +8,7 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.env.Environment;
 
@@ -19,13 +20,13 @@ import java.util.List;
 
 @Configuration
 @Profile("!test")
+@ConditionalOnProperty(name = "firebase.enabled", havingValue = "true", matchIfMissing = true)
 public class FirebaseConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(FirebaseConfig.class);
 
     private static final String FIREBASE_ENV_KEY = "FIREBASE_CONFIG_JSON";
     private static final String FIREBASE_PROPERTY_KEY = "firebase.config.json";
-    private static final String LOCAL_FIREBASE_FILE = "firebase.json";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final Environment environment;
@@ -46,13 +47,6 @@ public class FirebaseConfig {
 
             InputStream serviceAccount = getFirebaseServiceAccount();
 
-            if (serviceAccount == null) {
-                throw new IOException(
-                        "Firebase configuration missing. Set FIREBASE_CONFIG_JSON environment variable " +
-                                "or add firebase.json locally inside src/main/resources."
-                );
-            }
-
             initializeFirebaseApp(serviceAccount);
             logger.info("Firebase Admin SDK initialized successfully.");
 
@@ -62,7 +56,7 @@ public class FirebaseConfig {
         }
     }
 
-    private InputStream getFirebaseServiceAccount() throws IOException {
+    InputStream getFirebaseServiceAccount() throws IOException {
         String firebaseConfigJson = firstNonBlank(
                 System.getenv(FIREBASE_ENV_KEY),
                 environment.getProperty(FIREBASE_PROPERTY_KEY),
@@ -74,7 +68,9 @@ public class FirebaseConfig {
             return new ByteArrayInputStream(normalizedJson.getBytes(StandardCharsets.UTF_8));
         }
 
-        return getClass().getClassLoader().getResourceAsStream(LOCAL_FIREBASE_FILE);
+        throw new IOException(
+                "Firebase configuration missing. Set FIREBASE_CONFIG_JSON at runtime."
+        );
     }
 
     private String normalizeFirebaseJson(String rawJson) throws IOException {
