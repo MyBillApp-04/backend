@@ -17,6 +17,7 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
@@ -138,7 +139,7 @@ public class GlobalExceptionHandler {
                 "Image file is required. Please choose an image and try again.", request.getRequestURI(), ex);
     }
 
-    @ExceptionHandler({MultipartException.class, HttpMediaTypeNotSupportedException.class})
+    @ExceptionHandler(MultipartException.class)
     public ResponseEntity<Map<String, Object>> handleMalformedUpload(
             Exception ex,
             HttpServletRequest request
@@ -146,6 +147,19 @@ public class GlobalExceptionHandler {
         log.warn("Malformed image upload: {}", ex.getMessage());
         return buildErrorResponse(HttpStatus.BAD_REQUEST,
                 "Image upload format is invalid. Please choose the image again and retry.",
+                request.getRequestURI(),
+                ex
+        );
+    }
+
+    @ExceptionHandler({HttpMediaTypeNotSupportedException.class, HttpMessageNotReadableException.class})
+    public ResponseEntity<Map<String, Object>> handleMalformedRequest(
+            Exception ex,
+            HttpServletRequest request
+    ) {
+        log.warn("Malformed request body for {}: {}", request.getRequestURI(), ex.getMessage());
+        return buildErrorResponse(HttpStatus.BAD_REQUEST,
+                "Request body is invalid. Please refresh and try again.",
                 request.getRequestURI(),
                 ex
         );
