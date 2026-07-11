@@ -6,6 +6,10 @@ import com.mybill.MyBill_Backend.dto.sync.SyncRequest;
 import com.mybill.MyBill_Backend.dto.sync.SyncResponse;
 import com.mybill.MyBill_Backend.service.SyncService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Valid;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
+import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipException;
 
@@ -25,6 +30,7 @@ public class SyncController {
 
     private final SyncService syncService;
     private final ObjectMapper objectMapper;
+    private final Validator validator;
 
     @PostMapping
     public ResponseEntity<SyncResponse> sync(HttpServletRequest request) throws IOException {
@@ -54,11 +60,12 @@ public class SyncController {
             HttpStatus status = gzipped ? HttpStatus.UNSUPPORTED_MEDIA_TYPE : HttpStatus.BAD_REQUEST;
             throw new ResponseStatusException(status, "Unable to read sync request body", e);
         }
+        validateSyncRequest(syncRequest);
         return ResponseEntity.ok(syncService.sync(syncRequest));
     }
 
     @PostMapping("/background")
-    public ResponseEntity<SyncResponse> backgroundSync(@RequestBody SyncRequest syncRequest) {
+    public ResponseEntity<SyncResponse> backgroundSync(@Valid @RequestBody SyncRequest syncRequest) {
         syncRequest.setBackground(true);
         return ResponseEntity.ok(syncService.sync(syncRequest));
     }
@@ -66,5 +73,15 @@ public class SyncController {
     @GetMapping("/status/{deviceId}")
     public ResponseEntity<Map<String, Object>> deviceStatus(@PathVariable String deviceId) {
         return ResponseEntity.ok(syncService.getDeviceSyncStatus(deviceId));
+    }
+
+    private void validateSyncRequest(SyncRequest syncRequest) {
+        if (syncRequest == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Sync request body is required");
+        }
+        Set<ConstraintViolation<SyncRequest>> violations = validator.validate(syncRequest);
+        if (!violations.isEmpty()) {
+            throw new ConstraintViolationException(violations);
+        }
     }
 }

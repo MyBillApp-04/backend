@@ -2,8 +2,11 @@ package com.mybill.MyBill_Backend.validation;
 
 import com.mybill.MyBill_Backend.dto.ClientRequest;
 import com.mybill.MyBill_Backend.dto.ExpenseDTO;
+import com.mybill.MyBill_Backend.dto.InvoiceFilterDTO;
 import com.mybill.MyBill_Backend.dto.InvoiceRequest;
 import com.mybill.MyBill_Backend.dto.RecurringInvoiceScheduleDTO;
+import com.mybill.MyBill_Backend.dto.sync.SyncChangeDto;
+import com.mybill.MyBill_Backend.dto.sync.SyncRequest;
 import com.mybill.MyBill_Backend.entity.BusinessProfile;
 import com.mybill.MyBill_Backend.entity.ClientWork;
 import jakarta.validation.ConstraintViolation;
@@ -20,6 +23,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -189,6 +193,76 @@ class ValidationTest {
         request.setDiscount(Double.valueOf(value));
 
         assertViolationOn(request, "discount");
+    }
+
+    @Test
+    void invoiceFilterAcceptsValidRanges() {
+        InvoiceFilterDTO filter = validInvoiceFilter();
+
+        assertThat(validator.validate(filter)).isEmpty();
+    }
+
+    @Test
+    void invoiceFilterRejectsEndDateBeforeStartDate() {
+        InvoiceFilterDTO filter = validInvoiceFilter();
+        filter.setStartDate(LocalDateTime.of(2026, 7, 10, 10, 0));
+        filter.setEndDate(LocalDateTime.of(2026, 7, 9, 10, 0));
+
+        assertViolationOn(filter, "endDateOnOrAfterStartDate");
+    }
+
+    @Test
+    void invoiceFilterRejectsMaxAmountBelowMinAmount() {
+        InvoiceFilterDTO filter = validInvoiceFilter();
+        filter.setMinAmount(500.00);
+        filter.setMaxAmount(100.00);
+
+        assertViolationOn(filter, "maxAmountGreaterThanOrEqualToMinAmount");
+    }
+
+    @Test
+    void invoiceFilterRejectsNegativeAmountsAndLongQuery() {
+        InvoiceFilterDTO filter = validInvoiceFilter();
+        filter.setQuery("x".repeat(121));
+        filter.setMinAmount(-1.00);
+        filter.setMaxAmount(-0.01);
+
+        Set<ConstraintViolation<InvoiceFilterDTO>> violations = validator.validate(filter);
+
+        assertThat(violations).extracting(violation -> violation.getPropertyPath().toString())
+                .contains("query", "minAmount", "maxAmount");
+    }
+
+    @Test
+    void syncRequestAcceptsValidBatch() {
+        SyncRequest request = validSyncRequest();
+
+        assertThat(validator.validate(request)).isEmpty();
+    }
+
+    @Test
+    void syncRequestRejectsOversizedPageAndInvalidPolicy() {
+        SyncRequest request = validSyncRequest();
+        request.setPageSize(501);
+        request.setConflictPolicy("INVALID");
+
+        Set<ConstraintViolation<SyncRequest>> violations = validator.validate(request);
+
+        assertThat(violations).extracting(violation -> violation.getPropertyPath().toString())
+                .contains("pageSize", "conflictPolicy");
+    }
+
+    @Test
+    void syncRequestRejectsInvalidNestedChange() {
+        SyncRequest request = validSyncRequest();
+        SyncChangeDto change = request.getChanges().get(0);
+        change.setOperation("replace");
+        change.setPayload(null);
+
+        Set<ConstraintViolation<SyncRequest>> violations = validator.validate(request);
+
+        assertThat(violations).extracting(violation -> violation.getPropertyPath().toString())
+                .contains("changes[0].operation", "changes[0].payload");
     }
 
     @ParameterizedTest
@@ -369,6 +443,33 @@ class ValidationTest {
         request.setDueDate(LocalDateTime.now().plusDays(7));
         request.setDiscount(10.00);
         return request;
+    }
+
+    private static InvoiceFilterDTO validInvoiceFilter() {
+        InvoiceFilterDTO filter = new InvoiceFilterDTO();
+        filter.setQuery("Acme");
+        filter.setStartDate(LocalDateTime.now().minusDays(30));
+        filter.setEndDate(LocalDateTime.now());
+        filter.setMinAmount(10.00);
+        filter.setMaxAmount(1000.00);
+        return filter;
+    }
+
+    private static SyncRequest validSyncRequest() {
+        SyncChangeDto change = new SyncChangeDto();
+        change.setChangeId(UUID.randomUUID().toString());
+        change.setEntityType("client");
+        change.setEntityId(UUID.randomUUID().toString());
+        change.setOperation("upsert");
+        change.setPayload(Map.of("name", "Acme"));
+        change.setCreatedAt(LocalDateTime.now().minusMinutes(1));
+
+        return SyncRequest.builder()
+                .deviceId("device-1")
+                .changes(List.of(change))
+                .pageSize(100)
+                .conflictPolicy("CLIENT_WINS")
+                .build();
     }
 
     private static ExpenseDTO validExpense() {
