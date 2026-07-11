@@ -28,8 +28,7 @@ public class BackupJob {
     private User user;
 
     @Enumerated(EnumType.STRING)
-    private BackupProvider provider;y
-    
+    private BackupProvider provider;
 
     @Enumerated(EnumType.STRING)
     private BackupStatus status;

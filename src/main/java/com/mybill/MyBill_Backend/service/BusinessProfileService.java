@@ -116,7 +116,7 @@ public class BusinessProfileService {
         target.setOwnerName(required(source.getOwnerName(),
                 userName != null ? userName : "Business Owner"));
         target.setAddress(required(source.getAddress(), "Not Provided"));
-        target.setPhone(required(source.getPhone(), "Not Provided"));
+        target.setPhone(required(source.getPhone(), ""));
         target.setEmail(required(source.getEmail(),
                 userEmail != null ? userEmail : "not-provided@mybill.local"));
     }

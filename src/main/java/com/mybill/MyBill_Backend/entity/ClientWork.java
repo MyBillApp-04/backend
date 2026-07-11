@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
+import com.mybill.MyBill_Backend.validation.TwoDecimalPlaces;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -37,6 +38,7 @@ public class ClientWork {
 
     @NotNull(message = "Rate is required")
     @Positive(message = "Rate must be positive")
+    @TwoDecimalPlaces(message = "Rate can have at most two decimal places")
     @Column(columnDefinition = "double precision")
     private Double rate;
 

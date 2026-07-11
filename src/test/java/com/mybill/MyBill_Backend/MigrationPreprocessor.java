@@ -90,6 +90,7 @@ public class MigrationPreprocessor {
                                .replaceAll("(?i)CREATE\\s+TABLE\\s+(?!IF\\s+NOT\\s+EXISTS)", "CREATE TABLE IF NOT EXISTS ")
                                .replaceAll("(?i)PRIMARY\\s+KEY\\s+DEFAULT\\s+random_uuid\\(\\)", "DEFAULT random_uuid() PRIMARY KEY")
                                .replaceAll("(?i)^\\s*CREATE\\s+EXTENSION.*", "-- Removed CREATE EXTENSION statement")
+                               .replaceAll("(?i)public\\.email_templates\\s*\\(\\s*template_type,\\s*subject,\\s*html_body,\\s*is_deleted\\s*\\)", "public.email_templates(template_id, template_type, subject, html_body, is_deleted)")
                                .replaceAll("(?i)public\\.email_templates\\s*\\(\\s*template_type,\\s*subject,\\s*html_body\\)", "public.email_templates(template_id, template_type, subject, html_body)")
                                .replaceAll("(?i)SELECT\\s+'INVOICE',", "SELECT random_uuid(), 'INVOICE',")
                                .replaceAll("(?i)SELECT\\s+'REMINDER',", "SELECT random_uuid(), 'REMINDER',")
