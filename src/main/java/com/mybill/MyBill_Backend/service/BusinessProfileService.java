@@ -41,13 +41,10 @@ public class BusinessProfileService {
             existing.setThankYouNote(clean(profile.getThankYouNote()));
             existing.setTermsAndConditions(clean(profile.getTermsAndConditions()));
 
-            // Keep image paths safe: update only when frontend sends a non-empty path.
-            String logoPath = clean(profile.getLogoPath());
-            String qrPath = clean(profile.getQrImagePath());
-            String signaturePath = clean(profile.getSignaturePath());
-            if (logoPath != null) existing.setLogoPath(logoPath);
-            if (qrPath != null) existing.setQrImagePath(qrPath);
-            if (signaturePath != null) existing.setSignaturePath(signaturePath);
+            // Update image paths directly (allowing them to be cleared/updated to null when deleted by the user)
+            existing.setLogoPath(clean(profile.getLogoPath()));
+            existing.setQrImagePath(clean(profile.getQrImagePath()));
+            existing.setSignaturePath(clean(profile.getSignaturePath()));
 
             return repository.saveAndFlush(existing);
         }).orElseGet(() -> {

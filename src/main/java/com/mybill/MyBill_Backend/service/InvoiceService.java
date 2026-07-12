@@ -16,6 +16,9 @@ import com.mybill.MyBill_Backend.repository.InvoiceItemRepository;
 import com.mybill.MyBill_Backend.repository.InvoiceRepository;
 import com.mybill.MyBill_Backend.repository.UserRepository;
 import com.mybill.MyBill_Backend.util.SecurityUtils;
+import com.mybill.MyBill_Backend.exception.ConflictException;
+import com.mybill.MyBill_Backend.exception.ForbiddenException;
+import com.mybill.MyBill_Backend.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
@@ -72,33 +75,33 @@ public class InvoiceService {
             Long userId
     ) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new NotFoundException("User not found"));
 
         Client client = clientRepository.findByIdAndUserIdAndIsDeletedFalse(clientId, userId)
-                .orElseThrow(() -> new RuntimeException("Client not found"));
+                .orElseThrow(() -> new NotFoundException("Client not found"));
 
         List<ClientWork> works = workRepository.findAllById(workIds);
 
         if (works.isEmpty() || works.size() != workIds.size()) {
-            throw new RuntimeException("Some selected work records were not found");
+            throw new NotFoundException("Some selected work records were not found");
         }
 
         for (ClientWork work : works) {
             if (work.getClient() == null || !work.getClient().getId().equals(clientId)) {
-                throw new RuntimeException("Work " + work.getId() + " does not belong to client " + clientId);
+                throw new ForbiddenException("Work " + work.getId() + " does not belong to client " + clientId);
             }
 
             if (work.getUser() == null || !work.getUser().getId().equals(userId)) {
-                throw new RuntimeException("Work " + work.getId() + " does not belong to current user");
+                throw new ForbiddenException("Work " + work.getId() + " does not belong to current user");
             }
 
             if (Boolean.TRUE.equals(work.getIsDeleted())) {
-                throw new RuntimeException("Work " + work.getId() + " is deleted");
+                throw new NotFoundException("Work " + work.getId() + " is deleted");
             }
 
             if (Boolean.TRUE.equals(work.getBilled())
                     || invoiceItemRepository.existsByWorkIdAndUserIdAndIsDeletedFalse(work.getId(), userId)) {
-                throw new RuntimeException("Work " + work.getId() + " has already been billed");
+                throw new ConflictException("Work " + work.getId() + " has already been billed");
             }
         }
 
@@ -199,7 +202,7 @@ public class InvoiceService {
         double totalAmount = invoice.getTotalAmount() != null ? invoice.getTotalAmount() : 0.0;
 
         if (safePaidAmount < 0) {
-            throw new RuntimeException("Paid amount cannot be negative");
+            throw new IllegalArgumentException("Paid amount cannot be negative");
         }
 
         double cappedPaidAmount = Math.min(safePaidAmount, totalAmount);
@@ -237,7 +240,7 @@ public class InvoiceService {
             LocalDateTime paymentDate
     ) {
         Invoice invoice = invoiceRepository.findByIdAndUserId(invoiceId, userId)
-                .orElseThrow(() -> new RuntimeException("Invoice not found or access denied"));
+                .orElseThrow(() -> new NotFoundException("Invoice not found or access denied"));
 
         return applyPaymentUpdate(invoice, paidAmount, mode, paymentDate);
     }
@@ -252,7 +255,7 @@ public class InvoiceService {
             LocalDateTime paymentDate
     ) {
         Invoice invoice = invoiceRepository.findByIdAndUserId(invoiceId, userId)
-                .orElseThrow(() -> new RuntimeException("Invoice not found or access denied"));
+                .orElseThrow(() -> new NotFoundException("Invoice not found or access denied"));
 
         double currentPaid = invoice.getPaidAmount() != null ? invoice.getPaidAmount() : 0.0;
         double safeAmount = amount != null ? amount : 0.0;
@@ -274,7 +277,7 @@ public class InvoiceService {
             LocalDateTime paymentDate
     ) {
         Invoice invoice = invoiceRepository.findByIdAndUserId(invoiceId, userId)
-                .orElseThrow(() -> new RuntimeException("Invoice not found or access denied"));
+                .orElseThrow(() -> new NotFoundException("Invoice not found or access denied"));
 
         double currentPaid = invoice.getPaidAmount() != null ? invoice.getPaidAmount() : 0.0;
         double safeAmount = amount != null ? amount : 0.0;
@@ -313,7 +316,7 @@ public class InvoiceService {
         }
 
         Client client = clientRepository.findByIdAndUserId(clientId, userId)
-                .orElseThrow(() -> new RuntimeException("Client not found or access denied"));
+                .orElseThrow(() -> new NotFoundException("Client not found or access denied"));
 
         List<ClientWork> works = workRepository.findAllById(workIds);
 
@@ -356,7 +359,7 @@ public class InvoiceService {
         Long userId = securityUtils.getCurrentUserId();
 
         return invoiceRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> new RuntimeException("Invoice not found or access denied"));
+                .orElseThrow(() -> new NotFoundException("Invoice not found or access denied"));
     }
 
     @Transactional(readOnly = true)

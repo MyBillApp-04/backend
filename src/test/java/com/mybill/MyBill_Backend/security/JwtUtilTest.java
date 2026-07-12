@@ -25,7 +25,7 @@ class JwtUtilTest {
 
     @Test
     void signsAndVerifiesToken() {
-        String token = jwtUtil.generateToken("owner@example.com", Role.CLIENT);
+        String token = jwtUtil.generateToken("owner@example.com", Role.OWNER);
 
         assertThat(jwtUtil.validateToken(token)).isTrue();
         assertThat(jwtUtil.extractEmail(token)).isEqualTo("owner@example.com");
@@ -36,7 +36,7 @@ class JwtUtilTest {
 
     @Test
     void rejectsTamperedSignature() {
-        String token = jwtUtil.generateToken("owner@example.com", Role.CLIENT);
+        String token = jwtUtil.generateToken("owner@example.com", Role.OWNER);
         char replacement = token.endsWith("a") ? 'b' : 'a';
         String tampered = token.substring(0, token.length() - 1) + replacement;
 
@@ -46,7 +46,7 @@ class JwtUtilTest {
     @Test
     void usesConfiguredExpiration() {
         long beforeIssuing = System.currentTimeMillis();
-        String token = jwtUtil.generateToken("owner@example.com", Role.CLIENT);
+        String token = jwtUtil.generateToken("owner@example.com", Role.OWNER);
 
         var claims = io.jsonwebtoken.Jwts.parser()
                 .verifyWith((javax.crypto.SecretKey) ReflectionTestUtils.invokeMethod(

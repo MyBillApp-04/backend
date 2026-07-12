@@ -43,4 +43,40 @@ class BusinessProfileServiceTest {
 
         assertThat(saved.getPhone()).isEmpty();
     }
+
+    @Test
+    void testSaveOrUpdateProfileClearsImagesWhenNull() {
+        User user = User.builder().id(42L).name("Owner").email("owner@example.com").build();
+        BusinessProfile existing = BusinessProfile.builder()
+                .id(1L)
+                .user(user)
+                .businessName("Acme")
+                .ownerName("Owner")
+                .address("Main Road")
+                .logoPath("/uploads/logo.jpg")
+                .qrImagePath("/uploads/qr.jpg")
+                .signaturePath("/uploads/sig.jpg")
+                .build();
+                
+        BusinessProfile request = BusinessProfile.builder()
+                .businessName("Acme Updated")
+                .ownerName("Owner Updated")
+                .address("Main Road Updated")
+                .logoPath(null)
+                .qrImagePath(null)
+                .signaturePath(null)
+                .build();
+
+        when(securityUtils.getCurrentUserId()).thenReturn(42L);
+        when(securityUtils.getCurrentUser()).thenReturn(user);
+        when(repository.findByUserId(42L)).thenReturn(Optional.of(existing));
+        when(repository.saveAndFlush(org.mockito.ArgumentMatchers.any(BusinessProfile.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        BusinessProfile saved = service.saveOrUpdateProfile(request);
+
+        assertThat(saved.getLogoPath()).isNull();
+        assertThat(saved.getQrImagePath()).isNull();
+        assertThat(saved.getSignaturePath()).isNull();
+    }
 }

@@ -47,7 +47,7 @@ public class JwtUtil {
     }
 
     public String generateToken(String email) {
-        return generateToken(email, Role.CLIENT);
+        return generateToken(email, Role.OWNER);
     }
 
     public String extractEmail(String token) {
@@ -85,6 +85,16 @@ public class JwtUtil {
         return List.of(scope.split("\\s+"));
     }
 
+    /**
+     * Maps a {@link Role} to a Spring Security authority string.
+     *
+     * <ul>
+     *   <li>{@code ADMIN} → {@code ROLE_ADMIN}</li>
+     *   <li>{@code OWNER} → {@code ROLE_USER} (owner of the Owner Portal)</li>
+     *   <li>{@code CLIENT} → {@code ROLE_USER} (future Client Portal; same base authority,
+     *       endpoint-level checks will differentiate in v2)</li>
+     * </ul>
+     */
     public static String authorityFor(Role role) {
         if (role == Role.ADMIN) {
             return "ROLE_ADMIN";
@@ -104,6 +114,7 @@ public class JwtUtil {
             );
         }
 
+        // OWNER scope (same as previously CLIENT scope — no permission change for existing owners)
         return List.of(
                 "client:read",
                 "client:write",

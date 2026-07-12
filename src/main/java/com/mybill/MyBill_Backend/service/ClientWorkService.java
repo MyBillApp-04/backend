@@ -8,6 +8,8 @@ import com.mybill.MyBill_Backend.repository.ClientRepository;
 import com.mybill.MyBill_Backend.repository.InvoiceItemRepository;
 import com.mybill.MyBill_Backend.repository.ClientWorkRepository;
 import com.mybill.MyBill_Backend.util.SecurityUtils;
+import com.mybill.MyBill_Backend.exception.ForbiddenException;
+import com.mybill.MyBill_Backend.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,7 +33,7 @@ public class ClientWorkService {
         Long userId = securityUtils.getCurrentUserId();
 
         clientRepository.findByIdAndUserId(clientId, userId)
-                .orElseThrow(() -> new RuntimeException("Client not found or access denied"));
+                .orElseThrow(() -> new ForbiddenException("Client not found or access denied"));
 
         return workRepository.findByClientIdAndUserIdAndIsDeletedFalse(clientId, userId)
                 .stream()
@@ -54,7 +56,7 @@ public class ClientWorkService {
         Long userId = securityUtils.getCurrentUserId();
 
         clientRepository.findByIdAndUserId(clientId, userId)
-                .orElseThrow(() -> new RuntimeException("Client not found or access denied"));
+                .orElseThrow(() -> new ForbiddenException("Client not found or access denied"));
 
         return workRepository
                 .findByClientIdAndBilledFalseAndUserIdAndIsDeletedFalse(clientId, userId)
@@ -67,7 +69,7 @@ public class ClientWorkService {
         Long userId = securityUtils.getCurrentUserId();
 
         Client client = clientRepository.findByIdAndUserId(clientId, userId)
-                .orElseThrow(() -> new RuntimeException("Client not found or access denied"));
+                .orElseThrow(() -> new ForbiddenException("Client not found or access denied"));
 
         LocalDateTime now = LocalDateTime.now();
 
@@ -98,7 +100,7 @@ public class ClientWorkService {
         Long userId = securityUtils.getCurrentUserId();
 
         ClientWork existing = workRepository.findByIdAndUserId(workId, userId)
-                .orElseThrow(() -> new RuntimeException("Work not found or access denied"));
+                .orElseThrow(() -> new NotFoundException("Work not found or access denied"));
 
         Integer quantity = updatedWork.getQuantity() != null
                 ? updatedWork.getQuantity()
@@ -126,7 +128,7 @@ public class ClientWorkService {
         Long userId = securityUtils.getCurrentUserId();
 
         ClientWork existing = workRepository.findByIdAndUserId(workId, userId)
-                .orElseThrow(() -> new RuntimeException("Work not found or access denied"));
+                .orElseThrow(() -> new NotFoundException("Work not found or access denied"));
 
         existing.markDeleted(LocalDateTime.now());
 

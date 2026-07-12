@@ -90,7 +90,7 @@ public class AuthControllerTest {
         claims.put("firebase", firebaseClaim);
 
         when(firebaseToken.getClaims()).thenReturn(claims);
-        when(authService.firebaseLogin(eq(testEmail), eq(testName), eq(AuthProvider.GOOGLE), eq(Role.CLIENT)))
+        when(authService.firebaseLogin(eq(testEmail), eq(testName), eq(AuthProvider.GOOGLE), eq(Role.OWNER)))
                 .thenReturn(testJwt);
         double before = counterValue("auth_success", "refresh", "accepted");
 
@@ -104,7 +104,7 @@ public class AuthControllerTest {
         org.assertj.core.api.Assertions.assertThat(
                 counterValue("auth_success", "refresh", "accepted") - before
         ).isEqualTo(1.0);
-        verify(authService, times(1)).firebaseLogin(eq(testEmail), eq(testName), eq(AuthProvider.GOOGLE), eq(Role.CLIENT));
+        verify(authService, times(1)).firebaseLogin(eq(testEmail), eq(testName), eq(AuthProvider.GOOGLE), eq(Role.OWNER));
     }
 
     @Test
@@ -122,7 +122,7 @@ public class AuthControllerTest {
         claims.put("firebase", firebaseClaim);
 
         when(firebaseToken.getClaims()).thenReturn(claims);
-        when(authService.firebaseLogin(eq(testEmail), eq(testName), eq(AuthProvider.LOCAL), eq(Role.CLIENT)))
+        when(authService.firebaseLogin(eq(testEmail), eq(testName), eq(AuthProvider.LOCAL), eq(Role.OWNER)))
                 .thenReturn(testJwt);
 
         mockMvc.perform(post("/api/auth/firebase-login")
@@ -131,7 +131,7 @@ public class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").value(testJwt));
 
-        verify(authService, times(1)).firebaseLogin(eq(testEmail), eq(testName), eq(AuthProvider.LOCAL), eq(Role.CLIENT));
+        verify(authService, times(1)).firebaseLogin(eq(testEmail), eq(testName), eq(AuthProvider.LOCAL), eq(Role.OWNER));
     }
 
     @Test

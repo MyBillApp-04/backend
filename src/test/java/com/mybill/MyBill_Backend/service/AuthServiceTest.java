@@ -22,17 +22,17 @@ class AuthServiceTest {
     void createsNewFirebaseUserAndReturnsBackendJwt() {
         when(userRepository.findByEmail("new@example.com")).thenReturn(Optional.empty());
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(jwtUtil.generateToken("new@example.com", Role.CLIENT)).thenReturn("signed-jwt");
+        when(jwtUtil.generateToken("new@example.com", Role.OWNER)).thenReturn("signed-jwt");
 
         String token = authService.firebaseLogin(
-                "new@example.com", "", AuthProvider.LOCAL, Role.CLIENT);
+                "new@example.com", "", AuthProvider.LOCAL, Role.OWNER);
 
         assertThat(token).isEqualTo("signed-jwt");
         verify(userRepository).save(argThat(user ->
                 user.getEmail().equals("new@example.com")
                         && user.getName().equals("new")
                         && user.getProvider() == AuthProvider.LOCAL
-                        && user.getRole() == Role.CLIENT));
+                        && user.getRole() == Role.OWNER));
     }
 
     @Test
@@ -41,7 +41,7 @@ class AuthServiceTest {
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         authService.firebaseLogin(
-                "named@example.com", "Named User", AuthProvider.GOOGLE, Role.CLIENT);
+                "named@example.com", "Named User", AuthProvider.GOOGLE, Role.OWNER);
 
         verify(userRepository).save(argThat(user -> user.getName().equals("Named User")));
     }
@@ -52,7 +52,7 @@ class AuthServiceTest {
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         authService.firebaseLogin(
-                "prefix@example.com", null, AuthProvider.LOCAL, Role.CLIENT);
+                "prefix@example.com", null, AuthProvider.LOCAL, Role.OWNER);
 
         verify(userRepository).save(argThat(user -> user.getName().equals("prefix")));
     }
@@ -67,15 +67,15 @@ class AuthServiceTest {
                 .build();
         when(userRepository.findByEmail(existing.getEmail())).thenReturn(Optional.of(existing));
         when(userRepository.save(existing)).thenReturn(existing);
-        when(jwtUtil.generateToken(existing.getEmail(), Role.CLIENT)).thenReturn("upgraded-jwt");
+        when(jwtUtil.generateToken(existing.getEmail(), Role.OWNER)).thenReturn("upgraded-jwt");
 
         String token = authService.firebaseLogin(
-                existing.getEmail(), "Owner", AuthProvider.GOOGLE, Role.CLIENT);
+                existing.getEmail(), "Owner", AuthProvider.GOOGLE, Role.OWNER);
 
         assertThat(token).isEqualTo("upgraded-jwt");
         assertThat(existing.getName()).isEqualTo("Owner");
         assertThat(existing.getProvider()).isEqualTo(AuthProvider.GOOGLE);
-        assertThat(existing.getRole()).isEqualTo(Role.CLIENT);
+        assertThat(existing.getRole()).isEqualTo(Role.OWNER);
     }
 
     @Test
@@ -91,7 +91,7 @@ class AuthServiceTest {
         when(jwtUtil.generateToken(existing.getEmail(), Role.ADMIN)).thenReturn("existing-jwt");
 
         authService.firebaseLogin(
-                existing.getEmail(), "Replacement", AuthProvider.LOCAL, Role.CLIENT);
+                existing.getEmail(), "Replacement", AuthProvider.LOCAL, Role.OWNER);
 
         assertThat(existing.getName()).isEqualTo("Original");
         assertThat(existing.getProvider()).isEqualTo(AuthProvider.GOOGLE);
@@ -104,13 +104,13 @@ class AuthServiceTest {
                 .email("owner@example.com")
                 .name(null)
                 .provider(AuthProvider.GOOGLE)
-                .role(Role.CLIENT)
+                .role(Role.OWNER)
                 .build();
         when(userRepository.findByEmail(existing.getEmail())).thenReturn(Optional.of(existing));
         when(userRepository.save(existing)).thenReturn(existing);
 
         authService.firebaseLogin(
-                existing.getEmail(), null, AuthProvider.GOOGLE, Role.CLIENT);
+                existing.getEmail(), null, AuthProvider.GOOGLE, Role.OWNER);
 
         assertThat(existing.getName()).isNull();
         assertThat(existing.getProvider()).isEqualTo(AuthProvider.GOOGLE);
@@ -122,13 +122,13 @@ class AuthServiceTest {
                 .email("blank@example.com")
                 .name("")
                 .provider(AuthProvider.LOCAL)
-                .role(Role.CLIENT)
+                .role(Role.OWNER)
                 .build();
         when(userRepository.findByEmail(existing.getEmail())).thenReturn(Optional.of(existing));
         when(userRepository.save(existing)).thenReturn(existing);
 
         authService.firebaseLogin(
-                existing.getEmail(), " ", AuthProvider.LOCAL, Role.CLIENT);
+                existing.getEmail(), " ", AuthProvider.LOCAL, Role.OWNER);
 
         assertThat(existing.getName()).isEmpty();
     }

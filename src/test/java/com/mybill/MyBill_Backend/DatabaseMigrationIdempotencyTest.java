@@ -38,6 +38,7 @@ class DatabaseMigrationIdempotencyTest {
         jdbc.execute("ALTER TABLE customer_notification_templates ALTER COLUMN is_deleted SET DEFAULT false");
         jdbc.execute("ALTER TABLE customer_notification_templates ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP");
         jdbc.execute("ALTER TABLE customer_notification_templates ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP");
+        jdbc.execute("ALTER TABLE email_templates ALTER COLUMN is_deleted SET DEFAULT false");
 
         flyway = Flyway.configure()
                 .dataSource(dataSource)

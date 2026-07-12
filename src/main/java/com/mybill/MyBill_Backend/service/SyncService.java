@@ -5,6 +5,7 @@ import com.mybill.MyBill_Backend.dto.sync.payload.*;
 import com.mybill.MyBill_Backend.entity.*;
 import com.mybill.MyBill_Backend.repository.*;
 import com.mybill.MyBill_Backend.util.SecurityUtils;
+import com.mybill.MyBill_Backend.exception.NotFoundException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -413,11 +414,11 @@ public class SyncService {
         requirePositive(payload.getRate(), "Work rate must be positive");
         requirePositive(payload.getQuantity(), "Work quantity must be positive");
         if (payload.getWorkDate() != null && payload.getWorkDate().isAfter(serverTime)) {
-            throw new RuntimeException("Work date cannot be in the future");
+            throw new IllegalArgumentException("Work date cannot be in the future");
         }
 
         Client client = clientRepository.findByIdAndUserId(clientId, userId)
-                .orElseThrow(() -> new RuntimeException("Client not found for work"));
+                .orElseThrow(() -> new NotFoundException("Client not found for work"));
 
         ClientWork work = workRepository.findByIdAndUserId(id, userId)
                 .orElseGet(ClientWork::new);

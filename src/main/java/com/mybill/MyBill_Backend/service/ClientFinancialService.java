@@ -9,6 +9,7 @@ import com.mybill.MyBill_Backend.repository.ClientRepository;
 import com.mybill.MyBill_Backend.repository.InvoiceRepository;
 import com.mybill.MyBill_Backend.repository.PaymentRepository;
 import com.mybill.MyBill_Backend.util.SecurityUtils;
+import com.mybill.MyBill_Backend.exception.ForbiddenException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
@@ -97,7 +98,7 @@ public class ClientFinancialService {
     public ClientFinancialSummaryDTO getSummary(UUID clientId) {
         Long userId = securityUtils.getCurrentUserId();
         clientRepository.findByIdAndUserIdAndIsDeletedFalse(clientId, userId)
-                .orElseThrow(() -> new RuntimeException("Client not found or access denied"));
+                .orElseThrow(() -> new ForbiddenException("Client not found or access denied"));
 
         List<Object[]> statsList = invoiceRepository.getClientFinancialStats(clientId, userId);
         double totalBilled = 0.0;
@@ -125,7 +126,7 @@ public class ClientFinancialService {
     public Page<ClientLedgerEntry> getLedger(UUID clientId, Pageable pageable) {
         Long userId = securityUtils.getCurrentUserId();
         clientRepository.findByIdAndUserIdAndIsDeletedFalse(clientId, userId)
-                .orElseThrow(() -> new RuntimeException("Client not found or access denied"));
+                .orElseThrow(() -> new ForbiddenException("Client not found or access denied"));
         return ledgerRepository.findByClientIdAndUserIdAndIsDeletedFalseOrderByTransactionDateDesc(clientId, userId, pageable);
     }
 
@@ -134,7 +135,7 @@ public class ClientFinancialService {
         Long userId = securityUtils.getCurrentUserId();
         User user = securityUtils.getCurrentUser();
         Client client = clientRepository.findByIdAndUserIdAndIsDeletedFalse(clientId, userId)
-                .orElseThrow(() -> new RuntimeException("Client not found or access denied"));
+                .orElseThrow(() -> new ForbiddenException("Client not found or access denied"));
 
         double amount = request.getAmount() != null ? request.getAmount().doubleValue() : 0.0;
         if (amount <= 0) {

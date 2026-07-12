@@ -37,17 +37,8 @@ public class GlobalExceptionHandler {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private io.micrometer.core.instrument.MeterRegistry meterRegistry;
 
-    public static class NotFoundException extends RuntimeException {
-        public NotFoundException(String message) {
-            super(message);
-        }
-    }
-
-    public static class ForbiddenException extends RuntimeException {
-        public ForbiddenException(String message) {
-            super(message);
-        }
-    }
+    // NotFoundException, ForbiddenException, ConflictException, and FileStorageException
+    // are defined as top-level classes in the exception package.
 
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(
@@ -74,6 +65,36 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(
                 HttpStatus.FORBIDDEN,
                 "You do not have permission to perform this action",
+                request.getRequestURI(),
+                ex
+        );
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<Map<String, Object>> handleConflict(
+            ConflictException ex,
+            HttpServletRequest request
+    ) {
+        log.warn("Conflict: {}", ex.getMessage());
+
+        return buildErrorResponse(
+                HttpStatus.CONFLICT,
+                ex.getMessage(),
+                request.getRequestURI(),
+                ex
+        );
+    }
+
+    @ExceptionHandler(FileStorageException.class)
+    public ResponseEntity<Map<String, Object>> handleFileStorage(
+            FileStorageException ex,
+            HttpServletRequest request
+    ) {
+        log.error("File storage error: {}", ex.getMessage(), ex);
+
+        return buildErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "File could not be retrieved. Please try again later",
                 request.getRequestURI(),
                 ex
         );

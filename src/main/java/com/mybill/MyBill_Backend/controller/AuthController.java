@@ -75,7 +75,7 @@ public class AuthController {
                 name = email.split("@")[0];
             }
 
-            String jwt = authService.firebaseLogin(email, name, provider, Role.CLIENT);
+            String jwt = authService.firebaseLogin(email, name, provider, Role.OWNER);
             recordAuthResult("auth_success", flow, "accepted");
             log.info("Successful login for: {} via {}", email, provider);
             return ResponseEntity.ok(Map.of("token", jwt));

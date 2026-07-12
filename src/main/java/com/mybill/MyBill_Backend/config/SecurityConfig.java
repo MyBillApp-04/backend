@@ -93,7 +93,8 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         // Public: update checks work before/after login; Image.network shows logo without Auth.
                         .requestMatchers(HttpMethod.GET, "/api/app-version").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
+                        // Note: /uploads/** is intentionally NOT public. Files are served through
+                        // /api/files/{filename} which requires JWT authentication (see FileController).
                         .requestMatchers("/admin/**", "/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().authenticated()
