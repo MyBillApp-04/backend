@@ -5,6 +5,7 @@ import com.mybill.MyBill_Backend.dto.ClientWorkProjection;
 import com.mybill.MyBill_Backend.entity.ClientWork;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -90,8 +91,10 @@ public interface ClientWorkRepository extends JpaRepository<ClientWork, UUID> {
 
     List<ClientWork> findByUserId(Long userId);
 
+    @EntityGraph(attributePaths = {"client", "invoice"})
     Page<ClientWork> findByUserId(Long userId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"client", "invoice"})
     Page<ClientWork> findByUserIdAndUpdatedAtAfter(
             Long userId,
             LocalDateTime updatedAt,
@@ -140,4 +143,24 @@ public interface ClientWorkRepository extends JpaRepository<ClientWork, UUID> {
            ORDER BY w.id DESC
            """)
     List<ClientWorkProjection> findRecentActivityProjected(@Param("userId") Long userId, Pageable pageable);
+    @EntityGraph(attributePaths = {"client", "invoice"})
+    @Query("""
+           SELECT w FROM ClientWork w
+           WHERE w.user.id = :userId
+             AND (w.updatedAt > :lastTime OR (w.updatedAt = :lastTime AND w.id > :lastId))
+           """)
+    Page<ClientWork> findByUserIdWithKeyset(
+            @Param("userId") Long userId,
+            @Param("lastTime") LocalDateTime lastTime,
+            @Param("lastId") UUID lastId,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {"client", "invoice"})
+    @Query("SELECT w FROM ClientWork w WHERE w.user.id = :userId AND w.updatedAt >= :since")
+    Page<ClientWork> findByUserIdAndUpdatedAtGreaterThanEqual(
+            @Param("userId") Long userId,
+            @Param("since") LocalDateTime since,
+            Pageable pageable
+    );
 }

@@ -2,6 +2,7 @@ package com.mybill.MyBill_Backend.controller;
 
 import com.mybill.MyBill_Backend.entity.AuthProvider;
 import com.mybill.MyBill_Backend.entity.Role;
+import com.mybill.MyBill_Backend.observability.SecureLogMessageConverter;
 import com.mybill.MyBill_Backend.security.JwtTokenDenylist;
 import com.mybill.MyBill_Backend.security.JwtUtil;
 import com.mybill.MyBill_Backend.service.AuthService;
@@ -66,7 +67,8 @@ public class AuthController {
                     // "google.com" and anything else stays as GOOGLE
                 }
             } catch (Exception e) {
-                log.warn("Could not determine sign-in provider, defaulting to GOOGLE: {}", e.getMessage());
+                log.warn("Could not determine sign-in provider, defaulting to GOOGLE: exception={} message={}",
+                        e.getClass().getSimpleName(), SecureLogMessageConverter.sanitize(e.getMessage()));
             }
 
             // Get display name from token, fall back to email prefix
@@ -77,12 +79,13 @@ public class AuthController {
 
             String jwt = authService.firebaseLogin(email, name, provider, Role.OWNER);
             recordAuthResult("auth_success", flow, "accepted");
-            log.info("Successful login for: {} via {}", email, provider);
+            log.info("Successful login via {}", provider);
             return ResponseEntity.ok(Map.of("token", jwt));
 
         } catch (Exception e) {
             recordAuthResult("auth_failure", flow, "server_error");
-            log.error("Firebase login failed", e);
+            log.error("Firebase login failed: exception={} message={}",
+                    e.getClass().getSimpleName(), SecureLogMessageConverter.sanitize(e.getMessage()));
 
             String msg = e.getMessage();
             if (msg != null && msg.contains("FirebaseApp")) {

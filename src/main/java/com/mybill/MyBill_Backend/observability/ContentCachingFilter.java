@@ -11,6 +11,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.ContentCachingRequestWrapper;
 
 import java.io.IOException;
+import java.util.Locale;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 1)
@@ -22,11 +23,21 @@ public class ContentCachingFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
-        if (request instanceof ContentCachingRequestWrapper) {
+        if (request instanceof ContentCachingRequestWrapper || shouldSkipCaching(request)) {
             filterChain.doFilter(request, response);
         } else {
             ContentCachingRequestWrapper wrappedRequest = new ContentCachingRequestWrapper(request);
             filterChain.doFilter(wrappedRequest, response);
         }
+    }
+
+    private boolean shouldSkipCaching(HttpServletRequest request) {
+        String contentType = request.getContentType();
+        if (contentType != null && contentType.toLowerCase(Locale.ROOT).startsWith("multipart/")) {
+            return true;
+        }
+
+        String path = request.getRequestURI();
+        return path != null && path.startsWith("/api/sync");
     }
 }

@@ -2,6 +2,7 @@ package com.mybill.MyBill_Backend.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -12,10 +13,10 @@ import java.util.concurrent.Executors;
 public class HttpClientConfig {
 
     @Bean(destroyMethod = "shutdown")
-    public ExecutorService outboundHttpExecutor() {
-        return Executors.newFixedThreadPool(
-                Math.max(4, Runtime.getRuntime().availableProcessors() * 2)
-        );
+    public ExecutorService outboundHttpExecutor(
+            @Value("${app.http-client.threads:2}") int threads
+    ) {
+        return Executors.newFixedThreadPool(Math.max(1, threads));
     }
 
     @Bean

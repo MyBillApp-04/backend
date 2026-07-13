@@ -319,38 +319,91 @@ public class SyncService {
             int pageSize
     ) {
         Map<String, Object> changes = new LinkedHashMap<>();
+        Pageable pageable = PageRequest.of(0, pageSize, Sort.by("updatedAt").ascending().and(Sort.by("id").ascending()));
 
-        Pageable pageable = PageRequest.of(cursor.getPage(), pageSize, Sort.by("updatedAt").ascending());
+        // Clients
+        EntityCursor cc = cursor.get("client");
+        Page<Client> clientPage;
+        if (cc != null && cc.time != null && cc.id != null) {
+            clientPage = clientRepository.findByUserIdWithKeyset(userId, cc.time, cc.id, pageable);
+        } else {
+            clientPage = since == null ? clientRepository.findByUserId(userId, pageable) : clientRepository.findByUserIdAndUpdatedAtGreaterThanEqual(userId, since, pageable);
+        }
+        if (!clientPage.isEmpty()) {
+            Client last = clientPage.getContent().get(clientPage.getContent().size() - 1);
+            cursor.put("client", last.getUpdatedAt(), last.getId(), clientPage.hasNext());
+        } else {
+            cursor.put("client", null, null, false);
+        }
 
-        // Concurrently fetch all entity pages to reduce network round-trips
-        Page<Client> clientPage = since == null
-                ? clientRepository.findByUserId(userId, pageable)
-                : clientRepository.findByUserIdAndUpdatedAtAfter(userId, since, pageable);
+        // Works
+        EntityCursor wc = cursor.get("work");
+        Page<ClientWork> workPage;
+        if (wc != null && wc.time != null && wc.id != null) {
+            workPage = workRepository.findByUserIdWithKeyset(userId, wc.time, wc.id, pageable);
+        } else {
+            workPage = since == null ? workRepository.findByUserId(userId, pageable) : workRepository.findByUserIdAndUpdatedAtGreaterThanEqual(userId, since, pageable);
+        }
+        if (!workPage.isEmpty()) {
+            ClientWork last = workPage.getContent().get(workPage.getContent().size() - 1);
+            cursor.put("work", last.getUpdatedAt(), last.getId(), workPage.hasNext());
+        } else {
+            cursor.put("work", null, null, false);
+        }
 
-        Page<ClientWork> workPage = since == null
-                ? workRepository.findByUserId(userId, pageable)
-                : workRepository.findByUserIdAndUpdatedAtAfter(userId, since, pageable);
+        // Invoices
+        EntityCursor ic = cursor.get("invoice");
+        Page<Invoice> invoicePage;
+        if (ic != null && ic.time != null && ic.id != null) {
+            invoicePage = invoiceRepository.findByUserIdWithKeyset(userId, ic.time, ic.id, pageable);
+        } else {
+            invoicePage = since == null ? invoiceRepository.findByUserId(userId, pageable) : invoiceRepository.findByUserIdAndUpdatedAtGreaterThanEqual(userId, since, pageable);
+        }
+        if (!invoicePage.isEmpty()) {
+            Invoice last = invoicePage.getContent().get(invoicePage.getContent().size() - 1);
+            cursor.put("invoice", last.getUpdatedAt(), last.getId(), invoicePage.hasNext());
+        } else {
+            cursor.put("invoice", null, null, false);
+        }
 
-        Page<Invoice> invoicePage = since == null
-                ? invoiceRepository.findByUserId(userId, pageable)
-                : invoiceRepository.findByUserIdAndUpdatedAtAfter(userId, since, pageable);
+        // Invoice Items
+        EntityCursor iic = cursor.get("invoice_item");
+        Page<InvoiceItem> itemPage;
+        if (iic != null && iic.time != null && iic.id != null) {
+            itemPage = invoiceItemRepository.findByUserIdWithKeyset(userId, iic.time, iic.id, pageable);
+        } else {
+            itemPage = since == null ? invoiceItemRepository.findByUserId(userId, pageable) : invoiceItemRepository.findByUserIdAndUpdatedAtGreaterThanEqual(userId, since, pageable);
+        }
+        if (!itemPage.isEmpty()) {
+            InvoiceItem last = itemPage.getContent().get(itemPage.getContent().size() - 1);
+            cursor.put("invoice_item", last.getUpdatedAt(), last.getId(), itemPage.hasNext());
+        } else {
+            cursor.put("invoice_item", null, null, false);
+        }
 
-        Page<InvoiceItem> invoiceItemPage = since == null
-                ? invoiceItemRepository.findByUserId(userId, pageable)
-                : invoiceItemRepository.findByUserIdAndUpdatedAtAfter(userId, since, pageable);
-
-        Page<ClientLedgerEntry> ledgerEntryPage = since == null
-                ? ledgerEntryRepository.findByUserId(userId, pageable)
-                : ledgerEntryRepository.findByUserIdAndUpdatedAtAfter(userId, since, pageable);
+        // Ledger Entries
+        EntityCursor lc = cursor.get("ledger_entry");
+        Page<ClientLedgerEntry> ledgerPage;
+        if (lc != null && lc.time != null && lc.id != null) {
+            ledgerPage = ledgerEntryRepository.findByUserIdWithKeyset(userId, lc.time, lc.id, pageable);
+        } else {
+            ledgerPage = since == null ? ledgerEntryRepository.findByUserId(userId, pageable) : ledgerEntryRepository.findByUserIdAndUpdatedAtGreaterThanEqual(userId, since, pageable);
+        }
+        if (!ledgerPage.isEmpty()) {
+            ClientLedgerEntry last = ledgerPage.getContent().get(ledgerPage.getContent().size() - 1);
+            cursor.put("ledger_entry", last.getUpdatedAt(), last.getId(), ledgerPage.hasNext());
+        } else {
+            cursor.put("ledger_entry", null, null, false);
+        }
 
         changes.put("clients", clientPage.getContent().stream().map(this::clientToMap).toList());
         changes.put("works", workPage.getContent().stream().map(this::workToMap).toList());
         changes.put("invoices", invoicePage.getContent().stream().map(this::invoiceToMap).toList());
-        changes.put("invoiceItems", invoiceItemPage.getContent().stream().map(this::invoiceItemToMap).toList());
-        changes.put("ledgerEntries", ledgerEntryPage.getContent().stream().map(this::ledgerEntryToMap).toList());
+        changes.put("invoiceItems", itemPage.getContent().stream().map(this::invoiceItemToMap).toList());
+        changes.put("ledgerEntries", ledgerPage.getContent().stream().map(this::ledgerEntryToMap).toList());
 
-        boolean hasMore = clientPage.hasNext() || workPage.hasNext() || invoicePage.hasNext() || invoiceItemPage.hasNext() || ledgerEntryPage.hasNext();
-        String nextCursor = hasMore ? new PullCursor(cursor.getPage() + 1).encode() : null;
+        boolean hasMore = cursor.hasMoreOverall();
+        String nextCursor = hasMore ? cursor.encode() : null;
 
         return new SyncPageResult(changes, nextCursor, hasMore);
     }
@@ -921,31 +974,59 @@ public class SyncService {
         public boolean isHasMore() { return hasMore; }
     }
 
-    private static class PullCursor {
-        private final int page;
+    private static class EntityCursor {
+        public LocalDateTime time;
+        public UUID id;
+        public boolean hasMore;
 
-        public PullCursor(int page) {
-            this.page = page;
+        public EntityCursor(LocalDateTime time, UUID id, boolean hasMore) {
+            this.time = time;
+            this.id = id;
+            this.hasMore = hasMore;
         }
+    }
+
+    private static class PullCursor {
+        private final java.util.Map<String, EntityCursor> cursors = new java.util.HashMap<>();
+
+        public PullCursor() {}
 
         static PullCursor from(String cursor) {
-            if (cursor == null || cursor.isBlank()) {
-                return new PullCursor(0);
-            }
+            PullCursor pc = new PullCursor();
+            if (cursor == null || cursor.isBlank()) return pc;
             try {
                 String decoded = new String(Base64.getUrlDecoder().decode(cursor));
-                return new PullCursor(Integer.parseInt(decoded));
-            } catch (Exception e) {
-                return new PullCursor(0);
-            }
+                for (String part : decoded.split(";")) {
+                    if (part.isBlank()) continue;
+                    String[] kv = part.split("=");
+                    if (kv.length != 2) continue;
+                    String[] vals = kv[1].split("\\|");
+                    if (vals.length != 3) continue;
+                    LocalDateTime t = vals[0].isBlank() || vals[0].equals("null") ? null : LocalDateTime.parse(vals[0]);
+                    UUID i = vals[1].isBlank() || vals[1].equals("null") ? null : UUID.fromString(vals[1]);
+                    boolean hasMore = Boolean.parseBoolean(vals[2]);
+                    pc.cursors.put(kv[0], new EntityCursor(t, i, hasMore));
+                }
+            } catch (Exception e) {}
+            return pc;
         }
 
         String encode() {
-            return Base64.getUrlEncoder()
-                    .withoutPadding()
-                    .encodeToString(String.valueOf(page).getBytes());
+            StringBuilder sb = new StringBuilder();
+            for (java.util.Map.Entry<String, EntityCursor> e : cursors.entrySet()) {
+                EntityCursor ec = e.getValue();
+                sb.append(e.getKey()).append("=")
+                  .append(ec.time == null ? "null" : ec.time.toString()).append("|")
+                  .append(ec.id == null ? "null" : ec.id.toString()).append("|")
+                  .append(ec.hasMore).append(";");
+            }
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(sb.toString().getBytes());
         }
 
-        public int getPage() { return page; }
+        public EntityCursor get(String type) { return cursors.get(type); }
+        public void put(String type, LocalDateTime time, UUID id, boolean hasMore) { cursors.put(type, new EntityCursor(time, id, hasMore)); }
+        public boolean hasMoreOverall() {
+            return cursors.values().stream().anyMatch(c -> c.hasMore);
+        }
     }
 }

@@ -1,6 +1,7 @@
 package com.mybill.MyBill_Backend.security;
 
 import com.mybill.MyBill_Backend.repository.UserRepository;
+import com.mybill.MyBill_Backend.observability.SecureLogMessageConverter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -76,7 +77,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     var userOpt = userRepository.findByEmail(email);
                     if (userOpt.isEmpty()) {
                         if (log.isWarnEnabled()) {
-                            log.warn("Action: User with email {} does not exist in DB. Rejecting request.", email);
+                            log.warn("Action: Token subject has no matching user. Rejecting request.");
                         }
                         response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "User account no longer exists");
                         return;
@@ -87,7 +88,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                     if (!expectedRole.equals(tokenRole)) {
                         if (log.isWarnEnabled()) {
-                            log.warn("Action: Token role does not match persisted role for {}. Rejecting request.", email);
+                            log.warn("Action: Token role does not match persisted role. Rejecting request.");
                         }
                         response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token role is no longer valid");
                         return;
@@ -117,7 +118,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         } catch (Exception e) {
             if (log.isErrorEnabled()) {
-                log.error("Token validation exception", e);  // full stack trace in logs
+                log.error("Token validation exception: exception={} message={}",
+                        e.getClass().getSimpleName(), SecureLogMessageConverter.sanitize(e.getMessage()));
             }
             // Do not leak exception details to client – will be handled by GlobalExceptionHandler later
         }

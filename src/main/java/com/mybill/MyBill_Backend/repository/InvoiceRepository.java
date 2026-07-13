@@ -5,6 +5,7 @@ import com.mybill.MyBill_Backend.entity.Invoice;
 import com.mybill.MyBill_Backend.entity.PaymentStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -262,15 +263,21 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
     List<Invoice> findByUserId(Long userId);
 
+    @EntityGraph(attributePaths = {"client"})
     Page<Invoice> findByUserId(Long userId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"client"})
     Page<Invoice> findByUserIdAndUpdatedAtAfter(
             Long userId,
             LocalDateTime updatedAt,
             Pageable pageable
     );
 
+    @EntityGraph(attributePaths = {"client", "user"})
     List<Invoice> findByIsDeletedFalseAndPaymentStatusIn(List<PaymentStatus> statuses);
+
+    @EntityGraph(attributePaths = {"client", "user"})
+    Page<Invoice> findByIsDeletedFalseAndPaymentStatusIn(List<PaymentStatus> statuses, Pageable pageable);
 
     @Query("""
            SELECT 
@@ -298,5 +305,26 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
     List<Invoice> findPendingInvoicesByClient(
             @Param("clientId") java.util.UUID clientId,
             @Param("userId") Long userId
+    );
+
+    @EntityGraph(attributePaths = {"client"})
+    @Query("""
+           SELECT i FROM Invoice i
+           WHERE i.user.id = :userId
+             AND (i.updatedAt > :lastTime OR (i.updatedAt = :lastTime AND i.id > :lastId))
+           """)
+    Page<Invoice> findByUserIdWithKeyset(
+            @Param("userId") Long userId,
+            @Param("lastTime") LocalDateTime lastTime,
+            @Param("lastId") UUID lastId,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {"client"})
+    @Query("SELECT i FROM Invoice i WHERE i.user.id = :userId AND i.updatedAt >= :since")
+    Page<Invoice> findByUserIdAndUpdatedAtGreaterThanEqual(
+            @Param("userId") Long userId,
+            @Param("since") LocalDateTime since,
+            Pageable pageable
     );
 }

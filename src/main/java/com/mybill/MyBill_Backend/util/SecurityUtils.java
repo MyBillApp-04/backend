@@ -20,7 +20,7 @@ public class SecurityUtils {
         }
         String email = authentication.getName(); // assumes email is the principal
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
+                .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
     }
 
     /**

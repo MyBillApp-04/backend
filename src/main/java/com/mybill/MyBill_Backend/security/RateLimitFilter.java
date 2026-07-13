@@ -10,6 +10,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
@@ -50,10 +52,26 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Value("${app.security.rate-limit.auth-per-minute:10}")
     private int authLimitPerMinute;
 
-    private final Cache<String, WindowCounter> counters = Caffeine.newBuilder()
-            .expireAfterAccess(Duration.ofMinutes(2))
-            .maximumSize(50_000)
-            .build();
+    @Value("${app.security.trust-forwarded-headers:false}")
+    private boolean trustForwardedHeaders;
+
+    private final Cache<String, WindowCounter> counters;
+
+    public RateLimitFilter(SecurityUtils securityUtils) {
+        this(securityUtils, 5000);
+    }
+
+    @Autowired
+    public RateLimitFilter(
+            SecurityUtils securityUtils,
+            @Value("${app.security.rate-limit.cache-max-size:5000}") long cacheMaxSize
+    ) {
+        this.securityUtils = securityUtils;
+        this.counters = Caffeine.newBuilder()
+                .expireAfterAccess(Duration.ofMinutes(2))
+                .maximumSize(cacheMaxSize)
+                .build();
+    }
 
     @Override
     protected void doFilterInternal(
@@ -134,15 +152,39 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private String clientIp(HttpServletRequest request) {
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",")[0].trim().toLowerCase(Locale.ROOT);
-        }
-        String realIp = request.getHeader("X-Real-IP");
-        if (realIp != null && !realIp.isBlank()) {
-            return realIp.trim().toLowerCase(Locale.ROOT);
+        if (trustForwardedHeaders) {
+            String forwardedFor = request.getHeader("X-Forwarded-For");
+            if (forwardedFor != null && !forwardedFor.isBlank()) {
+                String firstHop = forwardedFor.split(",")[0].trim().toLowerCase(Locale.ROOT);
+                if (isValidIpAddress(firstHop)) {
+                    return firstHop;
+                }
+            }
+
+            String realIp = request.getHeader("X-Real-IP");
+            if (realIp != null && !realIp.isBlank()) {
+                String candidate = realIp.trim().toLowerCase(Locale.ROOT);
+                if (isValidIpAddress(candidate)) {
+                    return candidate;
+                }
+            }
         }
         return request.getRemoteAddr();
+    }
+
+    private boolean isValidIpAddress(String value) {
+        if (value == null || value.isBlank() || value.length() > 45) {
+            return false;
+        }
+        if (!value.matches("[0-9a-fA-F:.]+")) {
+            return false;
+        }
+        try {
+            InetAddress.getByName(value);
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private void reject(HttpServletResponse response, String message) throws IOException {

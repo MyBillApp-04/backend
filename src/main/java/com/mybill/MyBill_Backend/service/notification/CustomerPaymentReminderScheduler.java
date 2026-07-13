@@ -3,8 +3,11 @@ package com.mybill.MyBill_Backend.service.notification;
 import com.mybill.MyBill_Backend.entity.*;
 import com.mybill.MyBill_Backend.repository.InvoiceRepository;
 import com.mybill.MyBill_Backend.repository.CustomerNotificationLogRepository;
+import com.mybill.MyBill_Backend.service.DatabaseLockService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -20,14 +23,31 @@ public class CustomerPaymentReminderScheduler {
     private final InvoiceRepository invoiceRepository;
     private final CustomerNotificationLogRepository logRepository;
     private final CustomerNotificationService notificationService;
+    private final DatabaseLockService databaseLockService;
+    private final java.util.concurrent.atomic.AtomicBoolean running = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+    @Value("${app.notifications.reminders.batch-size:100}")
+    private int reminderBatchSize;
 
     @Scheduled(cron = "${app.notifications.reminders.cron:0 0 9 * * *}")
     public void sendPaymentReminders() {
+        if (!running.compareAndSet(false, true)) {
+            log.info("Skipping customer payment reminder run because the previous run is still active");
+            return;
+        }
+        if (!databaseLockService.tryLock(DatabaseLockService.CUSTOMER_PAYMENT_REMINDER)) {
+            log.info("Skipping customer payment reminder run because another instance owns the database scheduler lock");
+            running.set(false);
+            return;
+        }
+
+        try {
         log.info("Starting scheduled task for customer payment reminders");
 
         List<Invoice> activeDueInvoices = invoiceRepository.findByIsDeletedFalseAndPaymentStatusIn(
-                List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID)
-        );
+                List.of(PaymentStatus.UNPAID, PaymentStatus.PARTIALLY_PAID),
+                PageRequest.of(0, Math.max(1, reminderBatchSize))
+        ).getContent();
 
         if (activeDueInvoices.isEmpty()) {
             log.info("No unpaid or partially paid invoices found for reminders");
@@ -76,7 +96,8 @@ public class CustomerPaymentReminderScheduler {
                 LocalDateTime lastSent = logRepository.findLastSentTimeByInvoiceIdAndType(invoice.getId(), "PAYMENT_REMINDER");
 
                 if (lastSent == null || Duration.between(lastSent, now).toDays() >= frequencyDays) {
-                    log.info("Triggering payment reminder for Invoice: {}, Client: {}", invoice.getInvoiceNumber(), invoice.getClient().getName());
+                    log.info("Triggering payment reminder for invoice ID {} and client ID {}",
+                            invoice.getId(), invoice.getClient().getId());
                     
                     Map<String, Object> context = new HashMap<>();
                     context.put("amount", invoice.getRemainingAmount());
@@ -92,6 +113,10 @@ public class CustomerPaymentReminderScheduler {
                     );
                 }
             }
+        }
+        } finally {
+            databaseLockService.unlock(DatabaseLockService.CUSTOMER_PAYMENT_REMINDER);
+            running.set(false);
         }
     }
 }

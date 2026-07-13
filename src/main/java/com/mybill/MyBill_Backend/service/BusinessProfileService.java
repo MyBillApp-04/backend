@@ -9,10 +9,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 public class BusinessProfileService {
+
+    private static final Pattern UPLOAD_IMAGE_PATH = Pattern.compile(
+            "^/uploads/(logo|qr|signature)_[0-9a-fA-F-]{36}\\.(png|jpg)$"
+    );
 
     private final BusinessProfileRepository repository;
     private final SecurityUtils securityUtils;
@@ -41,10 +49,9 @@ public class BusinessProfileService {
             existing.setThankYouNote(clean(profile.getThankYouNote()));
             existing.setTermsAndConditions(clean(profile.getTermsAndConditions()));
 
-            // Update image paths directly (allowing them to be cleared/updated to null when deleted by the user)
-            existing.setLogoPath(clean(profile.getLogoPath()));
-            existing.setQrImagePath(clean(profile.getQrImagePath()));
-            existing.setSignaturePath(clean(profile.getSignaturePath()));
+            existing.setLogoPath(cleanExistingImagePath(profile.getLogoPath(), existing.getLogoPath()));
+            existing.setQrImagePath(cleanExistingImagePath(profile.getQrImagePath(), existing.getQrImagePath()));
+            existing.setSignaturePath(cleanExistingImagePath(profile.getSignaturePath(), existing.getSignaturePath()));
 
             return repository.saveAndFlush(existing);
         }).orElseGet(() -> {
@@ -56,9 +63,9 @@ public class BusinessProfileService {
             newProfile.setAccountNumber(clean(profile.getAccountNumber()));
             newProfile.setIfsc(clean(profile.getIfsc()));
             newProfile.setUpiId(clean(profile.getUpiId()));
-            newProfile.setLogoPath(clean(profile.getLogoPath()));
-            newProfile.setQrImagePath(clean(profile.getQrImagePath()));
-            newProfile.setSignaturePath(clean(profile.getSignaturePath()));
+            newProfile.setLogoPath(cleanNewImagePath(profile.getLogoPath()));
+            newProfile.setQrImagePath(cleanNewImagePath(profile.getQrImagePath()));
+            newProfile.setSignaturePath(cleanNewImagePath(profile.getSignaturePath()));
             newProfile.setThankYouNote(clean(profile.getThankYouNote()));
             newProfile.setTermsAndConditions(clean(profile.getTermsAndConditions()));
             return repository.saveAndFlush(newProfile);
@@ -86,7 +93,7 @@ public class BusinessProfileService {
     private BusinessProfile updateImagePath(String path, ImageField field) {
         Long userId = securityUtils.getCurrentUserId();
         User user = securityUtils.getCurrentUser();
-        String cleanPath = clean(path);
+        String cleanPath = cleanUploadedImagePath(path);
 
         BusinessProfile profile = repository.findByUserId(userId).orElseGet(() -> {
             BusinessProfile p = new BusinessProfile();
@@ -122,6 +129,39 @@ public class BusinessProfileService {
         if (value == null) return null;
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String cleanNewImagePath(String value) {
+        String cleanValue = clean(value);
+        if (cleanValue == null) return null;
+        throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Image paths can only be changed through the authenticated upload endpoints"
+        );
+    }
+
+    private String cleanExistingImagePath(String requestedValue, String currentValue) {
+        String cleanRequested = clean(requestedValue);
+        if (cleanRequested == null) return null;
+
+        String cleanCurrent = clean(currentValue);
+        if (cleanRequested.equals(cleanCurrent)) {
+            return cleanRequested;
+        }
+
+        throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Image paths can only be changed through the authenticated upload endpoints"
+        );
+    }
+
+    private String cleanUploadedImagePath(String value) {
+        String cleanValue = clean(value);
+        if (cleanValue == null) return null;
+        if (!UPLOAD_IMAGE_PATH.matcher(cleanValue).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid uploaded image path");
+        }
+        return cleanValue;
     }
 
     private String required(String value, String fallback) {

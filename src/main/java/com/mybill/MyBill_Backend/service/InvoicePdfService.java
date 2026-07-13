@@ -57,6 +57,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -92,8 +93,17 @@ public class InvoicePdfService {
     }
 
     public byte[] generateInvoicePdf(UUID invoiceId) {
-        Long userId = securityUtils.getCurrentUserId();
+        ByteArrayOutputStream out = new ByteArrayOutputStream(32 * 1024);
+        generateInvoicePdf(invoiceId, out);
+        return out.toByteArray();
+    }
 
+    public void generateInvoicePdf(UUID invoiceId, OutputStream out) {
+        Long userId = securityUtils.getCurrentUserId();
+        generateInvoicePdf(invoiceId, out, userId);
+    }
+
+    public void generateInvoicePdf(UUID invoiceId, OutputStream out, Long userId) {
         Invoice invoice = invoiceRepository.findByIdAndUserId(invoiceId, userId)
                 .orElseThrow(() -> new RuntimeException("Invoice not found or access denied"));
 
@@ -137,8 +147,6 @@ public class InvoicePdfService {
 
         String finalTerms = (customTerms != null && !customTerms.isBlank()) ? customTerms : profile.getTermsAndConditions();
         String finalUpiId = (customUpiId != null && !customUpiId.isBlank()) ? customUpiId : profile.getUpiId();
-
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
 
         try {
             PdfWriter writer = new PdfWriter(out, new WriterProperties()
@@ -544,7 +552,6 @@ public class InvoicePdfService {
             throw new RuntimeException("Error generating invoice PDF: " + e.getMessage(), e);
         }
 
-        return out.toByteArray();
     }
 
     private Paragraph infoLine(String label, String value, PdfFont regular, DeviceRgb muted) {
@@ -686,7 +693,7 @@ public class InvoicePdfService {
         return URLEncoder.encode(value.trim(), StandardCharsets.UTF_8).replace("+", "%20");
     }
 
-    private byte[] loadImage(String path) {
+    private java.nio.file.Path resolveUploadPath(String path) {
         if (path == null || path.isBlank()) return null;
 
         try {
@@ -703,13 +710,10 @@ public class InvoicePdfService {
                 return null;
             }
 
-            if (Files.isReadable(filePath)) {
-                return Files.readAllBytes(filePath);
-            }
+            return Files.isReadable(filePath) ? filePath : null;
         } catch (Exception ignored) {
+            return null;
         }
-
-        return null;
     }
 
     /**
@@ -717,12 +721,12 @@ public class InvoicePdfService {
      * original stays intact; only the invoice copy is resized and re-encoded.
      */
     private byte[] loadImage(String path, int maxWidth, int maxHeight, boolean forcePng) {
-        byte[] sourceBytes = loadImage(path);
-        if (sourceBytes == null) return null;
+        java.nio.file.Path sourcePath = resolveUploadPath(path);
+        if (sourcePath == null) return null;
 
         try {
-            BufferedImage source = ImageIO.read(new java.io.ByteArrayInputStream(sourceBytes));
-            if (source == null) return sourceBytes;
+            BufferedImage source = ImageIO.read(sourcePath.toFile());
+            if (source == null) return null;
 
             double scale = Math.min(1d,
                     Math.min((double) maxWidth / source.getWidth(), (double) maxHeight / source.getHeight()));
@@ -740,12 +744,12 @@ public class InvoicePdfService {
             graphics.dispose();
 
             if (usePng) {
-                ByteArrayOutputStream output = new ByteArrayOutputStream();
-                return ImageIO.write(resized, "png", output) ? output.toByteArray() : sourceBytes;
+                ByteArrayOutputStream output = new ByteArrayOutputStream(16 * 1024);
+                return ImageIO.write(resized, "png", output) ? output.toByteArray() : null;
             }
 
             ImageWriter writer = ImageIO.getImageWritersByFormatName("jpeg").next();
-            try (ByteArrayOutputStream output = new ByteArrayOutputStream();
+            try (ByteArrayOutputStream output = new ByteArrayOutputStream(16 * 1024);
                  ImageOutputStream stream = ImageIO.createImageOutputStream(output)) {
                 writer.setOutput(stream);
                 ImageWriteParam parameters = writer.getDefaultWriteParam();
@@ -757,7 +761,7 @@ public class InvoicePdfService {
                 writer.dispose();
             }
         } catch (Exception ignored) {
-            return sourceBytes;
+            return null;
         }
     }
 
@@ -849,7 +853,7 @@ public class InvoicePdfService {
             graphics.drawImage(cropped, (64 - width) / 2, (64 - height) / 2, width, height, null);
             graphics.dispose();
 
-            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            ByteArrayOutputStream output = new ByteArrayOutputStream(4 * 1024);
             if (!ImageIO.write(thumbnail, "png", output)) return null;
             return ImageDataFactory.create(output.toByteArray());
         } catch (Exception e) {

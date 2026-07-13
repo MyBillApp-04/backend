@@ -1,6 +1,7 @@
 package com.mybill.MyBill_Backend.service.notification;
 
 import com.mybill.MyBill_Backend.entity.*;
+import com.mybill.MyBill_Backend.observability.SecureLogMessageConverter;
 import com.mybill.MyBill_Backend.repository.*;
 import com.mybill.MyBill_Backend.service.notification.channel.NotificationChannelProvider;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class CustomerNotificationService {
     private final CustomerNotificationLogRepository logRepository;
     private final BusinessProfileRepository businessProfileRepository;
     private final List<NotificationChannelProvider> channelProviders;
+    private static final int RETRY_FETCH_BATCH_SIZE = 25;
 
     /**
      * Resolves the appropriate settings for the user, creating default settings if none exist.
@@ -61,14 +63,14 @@ public class CustomerNotificationService {
 
         // Check if the overall trigger type is enabled in the business settings
         if (!isTriggerEnabled(settings, type)) {
-            log.info("Notification type {} is disabled for user {}", type, user.getEmail());
+            log.info("Notification type {} is disabled for user ID {}", type, user.getId());
             return;
         }
 
         // Validate and normalize phone number
         String phone = customer.getPhone();
         if (phone == null || phone.trim().isEmpty()) {
-            log.warn("Cannot send notification. Customer {} has no phone number", customer.getName());
+            log.warn("Cannot send notification. Customer ID {} has no phone number", customer.getId());
             return;
         }
 
@@ -81,7 +83,8 @@ public class CustomerNotificationService {
         if (digitsOnly.length() == 10) {
             normalizedPhone = "91" + digitsOnly; // Default to India country code prefix
         } else if (digitsOnly.length() < 10) {
-            log.warn("Cannot send notification. Customer {} has an invalid phone number length: {}", customer.getName(), phone);
+            log.warn("Cannot send notification. Customer ID {} has invalid phone number length: {}",
+                    customer.getId(), digitsOnly.length());
             return;
         } else {
             normalizedPhone = digitsOnly;
@@ -102,7 +105,7 @@ public class CustomerNotificationService {
         }
 
         if (activeChannels.isEmpty()) {
-            log.info("No active notification channels enabled for user {}", user.getEmail());
+            log.info("No active notification channels enabled for user ID {}", user.getId());
             return;
         }
 
@@ -165,7 +168,10 @@ public class CustomerNotificationService {
             logRepository.save(notificationLog);
 
         } catch (Exception e) {
-            log.error("Failed to send customer notification: {}", e.getMessage(), e);
+            log.error("Failed to send customer notification: notificationId={} exception={} message={}",
+                    notificationLog.getNotificationId(),
+                    e.getClass().getSimpleName(),
+                    SecureLogMessageConverter.sanitize(e.getMessage()));
 
             // Update log on failure
             notificationLog.setStatus("FAILED");
@@ -180,36 +186,48 @@ public class CustomerNotificationService {
      */
     @Transactional
     public void retryFailedNotifications(int maxAttempts) {
-        List<CustomerNotificationLog> failedLogs = logRepository.findByStatusAndRetryCountLessThan("FAILED", maxAttempts);
-        if (failedLogs.isEmpty()) return;
+        List<UUID> failedLogIds = logRepository.findRetryableIds("FAILED", maxAttempts);
+        if (failedLogIds.isEmpty()) return;
 
-        log.info("Found {} failed notifications for retry execution", failedLogs.size());
+        log.info("Found {} failed notifications for retry execution", failedLogIds.size());
 
-        for (CustomerNotificationLog logEntry : failedLogs) {
-            logEntry.setStatus("RETRYING");
-            logRepository.saveAndFlush(logEntry);
+        for (int start = 0; start < failedLogIds.size(); start += RETRY_FETCH_BATCH_SIZE) {
+            List<UUID> batchIds = failedLogIds.subList(start, Math.min(start + RETRY_FETCH_BATCH_SIZE, failedLogIds.size()));
+            Map<UUID, CustomerNotificationLog> logsById = new HashMap<>();
+            logRepository.findByNotificationIdIn(batchIds)
+                    .forEach(logEntry -> logsById.put(logEntry.getNotificationId(), logEntry));
 
-            CustomerNotificationSettings settings = getOrInitializeSettings(logEntry.getUser());
-            CustomerNotificationTemplate template = getTemplate(logEntry.getUser().getId(), logEntry.getNotificationType(), logEntry.getChannel());
+            for (UUID failedLogId : batchIds) {
+                CustomerNotificationLog logEntry = logsById.get(failedLogId);
+                if (logEntry == null) {
+                    continue;
+                }
 
-            if (template == null) {
-                logEntry.setStatus("FAILED");
-                logEntry.setFailureReason("Template missing for retry dispatch");
-                logRepository.save(logEntry);
-                continue;
+                logEntry.setStatus("RETRYING");
+                logRepository.saveAndFlush(logEntry);
+
+                CustomerNotificationSettings settings = getOrInitializeSettings(logEntry.getUser());
+                CustomerNotificationTemplate template = getTemplate(logEntry.getUser().getId(), logEntry.getNotificationType(), logEntry.getChannel());
+
+                if (template == null) {
+                    logEntry.setStatus("FAILED");
+                    logEntry.setFailureReason("Template missing for retry dispatch");
+                    logRepository.save(logEntry);
+                    continue;
+                }
+
+                // Create context values based on entity states
+                Map<String, Object> contextValues = new HashMap<>();
+                if (logEntry.getInvoice() != null) {
+                    Invoice inv = logEntry.getInvoice();
+                    contextValues.put("amount", inv.getRemainingAmount());
+                    contextValues.put("receivedAmount", inv.getPaidAmount());
+                    contextValues.put("remainingAmount", inv.getRemainingAmount());
+                    contextValues.put("paymentStatus", inv.getPaymentStatus().name());
+                }
+
+                sendWithLogUpdate(logEntry, template, settings, logEntry.getCustomer(), logEntry.getInvoice(), contextValues);
             }
-
-            // Create context values based on entity states
-            Map<String, Object> contextValues = new HashMap<>();
-            if (logEntry.getInvoice() != null) {
-                Invoice inv = logEntry.getInvoice();
-                contextValues.put("amount", inv.getRemainingAmount());
-                contextValues.put("receivedAmount", inv.getPaidAmount());
-                contextValues.put("remainingAmount", inv.getRemainingAmount());
-                contextValues.put("paymentStatus", inv.getPaymentStatus().name());
-            }
-
-            sendWithLogUpdate(logEntry, template, settings, logEntry.getCustomer(), logEntry.getInvoice(), contextValues);
         }
     }
 

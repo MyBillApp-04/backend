@@ -4,6 +4,7 @@ import com.mybill.MyBill_Backend.entity.ClientLedgerEntry;
 import com.mybill.MyBill_Backend.entity.LedgerEntryType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -27,8 +28,10 @@ public interface ClientLedgerEntryRepository extends JpaRepository<ClientLedgerE
 
     List<ClientLedgerEntry> findByUserId(Long userId);
 
+    @EntityGraph(attributePaths = {"client", "invoice", "payment"})
     Page<ClientLedgerEntry> findByUserId(Long userId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"client", "invoice", "payment"})
     Page<ClientLedgerEntry> findByUserIdAndUpdatedAtAfter(Long userId, LocalDateTime updatedAt, Pageable pageable);
 
     boolean existsByInvoiceIdAndTypeAndUserIdAndIsDeletedFalse(UUID invoiceId, LedgerEntryType type, Long userId);
@@ -49,4 +52,25 @@ public interface ClientLedgerEntryRepository extends JpaRepository<ClientLedgerE
              AND le.isDeleted = false
            """)
     Double getAdvanceBalance(@Param("clientId") UUID clientId, @Param("userId") Long userId);
+
+    @EntityGraph(attributePaths = {"client", "invoice", "payment"})
+    @Query("""
+           SELECT l FROM ClientLedgerEntry l
+           WHERE l.user.id = :userId
+             AND (l.updatedAt > :lastTime OR (l.updatedAt = :lastTime AND l.id > :lastId))
+           """)
+    Page<ClientLedgerEntry> findByUserIdWithKeyset(
+            @Param("userId") Long userId,
+            @Param("lastTime") LocalDateTime lastTime,
+            @Param("lastId") UUID lastId,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {"client", "invoice", "payment"})
+    @Query("SELECT l FROM ClientLedgerEntry l WHERE l.user.id = :userId AND l.updatedAt >= :since")
+    Page<ClientLedgerEntry> findByUserIdAndUpdatedAtGreaterThanEqual(
+            @Param("userId") Long userId,
+            @Param("since") LocalDateTime since,
+            Pageable pageable
+    );
 }

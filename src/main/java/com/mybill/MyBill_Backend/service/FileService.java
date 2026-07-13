@@ -4,6 +4,7 @@ import com.mybill.MyBill_Backend.entity.BusinessProfile;
 import com.mybill.MyBill_Backend.exception.FileStorageException;
 import com.mybill.MyBill_Backend.exception.ForbiddenException;
 import com.mybill.MyBill_Backend.exception.NotFoundException;
+import com.mybill.MyBill_Backend.observability.SecureLogMessageConverter;
 import com.mybill.MyBill_Backend.repository.BusinessProfileRepository;
 import com.mybill.MyBill_Backend.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * Provides authenticated, ownership-checked access to uploaded business files
@@ -40,6 +42,10 @@ import java.util.Optional;
 @Slf4j
 public class FileService {
 
+    private static final Pattern SAFE_UPLOAD_FILENAME = Pattern.compile(
+            "^(logo|qr|signature)_[0-9a-fA-F-]{36}\\.(png|jpg)$"
+    );
+
     private final BusinessProfileRepository businessProfileRepository;
     private final SecurityUtils securityUtils;
 
@@ -58,19 +64,20 @@ public class FileService {
      */
     public Resource loadFileAsResource(String filename) {
         Long userId = securityUtils.getCurrentUserId();
+        String safeFilename = requireSafeUploadFilename(filename);
 
         // 1. Normalise and sanitise the filename — prevent path traversal
         Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
-        Path filePath = uploadPath.resolve(filename).normalize();
+        Path filePath = uploadPath.resolve(safeFilename).normalize();
 
         if (!filePath.startsWith(uploadPath)) {
             // Treat path traversal the same as a missing file — do not confirm existence
-            log.warn("Path traversal attempt detected for filename '{}' by user {}", filename, userId);
+            log.warn("Path traversal attempt detected for filename '{}' by user {}", safeFilename, userId);
             throw new NotFoundException("File not found");
         }
 
         // 2. Verify ownership: the requesting user's business profile must reference this file
-        String serverPath = "/uploads/" + filename;
+        String serverPath = "/uploads/" + safeFilename;
         Optional<BusinessProfile> profile = businessProfileRepository.findByUserId(userId);
 
         boolean isOwned = profile.map(p ->
@@ -81,26 +88,27 @@ public class FileService {
 
         if (!isOwned) {
             log.warn("User {} attempted to access file '{}' which does not belong to their profile",
-                    userId, filename);
+                    userId, safeFilename);
             throw new ForbiddenException("You do not have access to this file");
         }
 
         // 3. Check the file exists on disk
         if (!Files.exists(filePath) || !Files.isRegularFile(filePath)) {
-            log.warn("File '{}' not found on disk for user {}", filename, userId);
-            throw new NotFoundException("File not found: " + filename);
+            log.warn("File '{}' not found on disk for user {}", safeFilename, userId);
+            throw new NotFoundException("File not found: " + safeFilename);
         }
 
         // 4. Load as a URL resource
         try {
             Resource resource = new UrlResource(filePath.toUri());
             if (!resource.isReadable()) {
-                throw new FileStorageException("File is not readable: " + filename);
+                throw new FileStorageException("File is not readable: " + safeFilename);
             }
             return resource;
         } catch (MalformedURLException e) {
-            log.error("Malformed URL for file '{}': {}", filename, e.getMessage());
-            throw new FileStorageException("File could not be resolved: " + filename, e);
+            log.error("Malformed URL for uploaded file: userId={} filename={} exception={} message={}",
+                    userId, safeFilename, e.getClass().getSimpleName(), SecureLogMessageConverter.sanitize(e.getMessage()));
+            throw new FileStorageException("File could not be resolved: " + safeFilename, e);
         }
     }
 
@@ -111,11 +119,16 @@ public class FileService {
      * @return the MIME type string; defaults to {@code application/octet-stream}
      */
     public String detectContentType(String filename) {
-        String lower = filename.toLowerCase();
-        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+        String lower = requireSafeUploadFilename(filename).toLowerCase();
+        if (lower.endsWith(".jpg")) return "image/jpeg";
         if (lower.endsWith(".png")) return "image/png";
-        if (lower.endsWith(".gif")) return "image/gif";
-        if (lower.endsWith(".webp")) return "image/webp";
         return "application/octet-stream";
+    }
+
+    public String requireSafeUploadFilename(String filename) {
+        if (filename == null || !SAFE_UPLOAD_FILENAME.matcher(filename).matches()) {
+            throw new NotFoundException("File not found");
+        }
+        return filename;
     }
 }

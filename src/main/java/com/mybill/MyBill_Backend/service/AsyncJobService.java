@@ -2,8 +2,11 @@ package com.mybill.MyBill_Backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mybill.MyBill_Backend.entity.AsyncJob;
+import com.mybill.MyBill_Backend.entity.BackupStatus;
 import com.mybill.MyBill_Backend.entity.User;
+import com.mybill.MyBill_Backend.observability.SecureLogMessageConverter;
 import com.mybill.MyBill_Backend.repository.AsyncJobRepository;
+import com.mybill.MyBill_Backend.repository.BackupJobRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
@@ -22,6 +25,7 @@ public class AsyncJobService {
     private final AsyncJobRepository asyncJobRepository;
     private final ObjectMapper objectMapper;
     private final ApplicationContext applicationContext;
+    private final BackupJobRepository backupJobRepository;
 
     @Transactional
     public AsyncJob enqueue(String jobType, Object payload, User user, UUID invoiceId) {
@@ -39,7 +43,8 @@ public class AsyncJobService {
                     .build();
             return asyncJobRepository.save(job);
         } catch (Exception e) {
-            log.error("Failed to enqueue async job of type {}", jobType, e);
+            log.error("Failed to enqueue async job: type={} exception={} message={}",
+                    jobType, e.getClass().getSimpleName(), SecureLogMessageConverter.sanitize(e.getMessage()));
             throw new RuntimeException("Failed to enqueue async job", e);
         }
     }
@@ -53,7 +58,6 @@ public class AsyncJobService {
             log.info("Starting execution of async job: ID={}, Type={}", job.getJobId(), job.getJobType());
 
             switch (job.getJobType()) {
-                case "EMAIL" -> executeEmailJob(job);
                 case "GOOGLE_DRIVE_BACKUP" -> executeGoogleDriveBackupJob(job);
                 case "STRIPE_PAYMENT" -> executeStripePaymentJob(job);
                 default -> throw new IllegalArgumentException("Unknown job type: " + job.getJobType());
@@ -63,13 +67,15 @@ public class AsyncJobService {
             job.setLastError(null);
             log.info("Successfully completed async job: ID={}", job.getJobId());
         } catch (Exception e) {
-            log.error("Failed executing async job: ID={}", job.getJobId(), e);
+            log.error("Failed executing async job: ID={} exception={} message={}",
+                    job.getJobId(), e.getClass().getSimpleName(), SecureLogMessageConverter.sanitize(e.getMessage()));
             int attempts = job.getAttemptCount() + 1;
             job.setAttemptCount(attempts);
             job.setLastError(e.getMessage());
 
             if (attempts >= job.getMaxAttempts()) {
                 job.setStatus("DEAD");
+                markRelatedBackupFailed(job, e);
                 log.warn("Job ID={} moved to Dead Letter Queue (DLQ) after {} attempts", job.getJobId(), attempts);
             } else {
                 job.setStatus("FAILED");
@@ -81,32 +87,23 @@ public class AsyncJobService {
         asyncJobRepository.save(job);
     }
 
-    private void executeEmailJob(AsyncJob job) throws Exception {
-        EmailService emailService = applicationContext.getBean(EmailService.class);
-        Map<?, ?> map = objectMapper.readValue(job.getPayload(), Map.class);
-
-        String recipient = (String) map.get("recipient");
-        String subject = (String) map.get("subject");
-        String body = (String) map.get("body");
-        String templateType = (String) map.get("templateType");
-        Boolean attachInvoicePdf = (Boolean) map.get("attachInvoicePdf");
-
-        com.mybill.MyBill_Backend.entity.EmailLog logEntity = com.mybill.MyBill_Backend.entity.EmailLog.builder()
-                .user(job.getUser())
-                .recipient(recipient)
-                .subject(subject)
-                .body(body)
-                .status(com.mybill.MyBill_Backend.entity.EmailStatus.PENDING)
-                .templateType(templateType)
-                .invoiceId(job.getInvoiceId())
-                .attemptCount(0)
-                .build();
-
-        logEntity = applicationContext.getBean(com.mybill.MyBill_Backend.repository.EmailLogRepository.class).save(logEntity);
-        emailService.attemptSend(logEntity, Boolean.TRUE.equals(attachInvoicePdf));
-
-        if (logEntity.getStatus() == com.mybill.MyBill_Backend.entity.EmailStatus.FAILED) {
-            throw new RuntimeException("Email delivery failed: " + logEntity.getErrorMessage());
+    private void markRelatedBackupFailed(AsyncJob job, Exception failure) {
+        if (!"GOOGLE_DRIVE_BACKUP".equals(job.getJobType())) {
+            return;
+        }
+        try {
+            Map<?, ?> map = objectMapper.readValue(job.getPayload(), Map.class);
+            UUID backupJobId = UUID.fromString((String) map.get("backupJobId"));
+            backupJobRepository.findById(backupJobId).ifPresent(backupJob -> {
+                backupJob.setStatus(BackupStatus.FAILED);
+                backupJob.setErrorMessage(failure.getMessage());
+                backupJobRepository.save(backupJob);
+            });
+        } catch (Exception markerFailure) {
+            log.error("Failed to mark related backup job as failed: asyncJobId={} exception={} message={}",
+                    job.getJobId(),
+                    markerFailure.getClass().getSimpleName(),
+                    SecureLogMessageConverter.sanitize(markerFailure.getMessage()));
         }
     }
 

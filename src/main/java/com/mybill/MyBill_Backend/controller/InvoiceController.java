@@ -8,6 +8,7 @@ import com.mybill.MyBill_Backend.entity.Invoice;
 import com.mybill.MyBill_Backend.entity.PaymentMode;
 import com.mybill.MyBill_Backend.service.InvoicePdfService;
 import com.mybill.MyBill_Backend.service.InvoiceService;
+import com.mybill.MyBill_Backend.util.SecurityUtils;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -28,6 +29,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -41,6 +43,7 @@ public class InvoiceController {
 
     private final InvoiceService invoiceService;
     private final InvoicePdfService invoicePdfService;
+    private final SecurityUtils securityUtils;
 
     @PostMapping("/generate")
     public ResponseEntity<Invoice> generateInvoice(@Valid @RequestBody InvoiceRequest request) {
@@ -71,14 +74,13 @@ public class InvoiceController {
     }
 
     @GetMapping("/pdf/{invoiceId}")
-    public ResponseEntity<byte[]> downloadInvoice(@PathVariable UUID invoiceId) {
+    public ResponseEntity<StreamingResponseBody> downloadInvoice(@PathVariable UUID invoiceId) {
         Invoice invoice = invoiceService.getInvoiceById(invoiceId);
-
-        byte[] pdfBytes = invoicePdfService.generateInvoicePdf(invoiceId);
 
         String invoiceNumber = invoice.getInvoiceNumber() != null
                 ? invoice.getInvoiceNumber()
                 : "invoice-" + invoiceId;
+        Long userId = securityUtils.getCurrentUserId();
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
@@ -88,7 +90,8 @@ public class InvoiceController {
                         .build()
         );
 
-        return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+        StreamingResponseBody stream = outputStream -> invoicePdfService.generateInvoicePdf(invoiceId, outputStream, userId);
+        return new ResponseEntity<>(stream, headers, HttpStatus.OK);
     }
 
     // NEW: Paginated projection response for large histories

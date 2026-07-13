@@ -5,6 +5,7 @@ import com.mybill.MyBill_Backend.event.AdvanceBalanceAvailableEvent;
 import com.mybill.MyBill_Backend.event.InvoiceCreatedEvent;
 import com.mybill.MyBill_Backend.event.InvoiceUpdatedEvent;
 import com.mybill.MyBill_Backend.event.PaymentRecordedEvent;
+import com.mybill.MyBill_Backend.observability.SecureLogMessageConverter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -25,11 +26,11 @@ public class CustomerNotificationEventListener {
     @EventListener
     public void handleInvoiceCreated(InvoiceCreatedEvent event) {
         Invoice invoice = event.getInvoice();
-        log.info("Handling InvoiceCreatedEvent for invoice: {}", invoice.getInvoiceNumber());
+        log.info("Handling InvoiceCreatedEvent for invoice ID {}", invoice.getId());
 
         // Skip sending automated alerts for backdated/historical synced invoices (created more than 24 hours ago)
         if (invoice.getInvoiceDate() != null && invoice.getInvoiceDate().isBefore(java.time.LocalDateTime.now().minusDays(1))) {
-            log.info("Skipping automated notification trigger for historical synced invoice: {}", invoice.getInvoiceNumber());
+            log.info("Skipping automated notification trigger for historical synced invoice ID {}", invoice.getId());
             return;
         }
 
@@ -47,7 +48,8 @@ public class CustomerNotificationEventListener {
                     context
             );
         } catch (Exception e) {
-            log.error("Failed to send customer notification for invoice creation: ID={}. Continuing gracefully.", invoice.getId(), e);
+            log.error("Failed to send customer notification for invoice creation: invoiceId={} exception={} message={}. Continuing gracefully.",
+                    invoice.getId(), e.getClass().getSimpleName(), SecureLogMessageConverter.sanitize(e.getMessage()));
         }
     }
 
@@ -55,7 +57,7 @@ public class CustomerNotificationEventListener {
     @EventListener
     public void handleInvoiceUpdated(InvoiceUpdatedEvent event) {
         Invoice invoice = event.getInvoice();
-        log.info("Handling InvoiceUpdatedEvent for invoice: {}", invoice.getInvoiceNumber());
+        log.info("Handling InvoiceUpdatedEvent for invoice ID {}", invoice.getId());
 
         Map<String, Object> context = new HashMap<>();
         context.put("amount", invoice.getTotalAmount());
@@ -71,7 +73,8 @@ public class CustomerNotificationEventListener {
                     context
             );
         } catch (Exception e) {
-            log.error("Failed to send customer notification for invoice update: ID={}. Continuing gracefully.", invoice.getId(), e);
+            log.error("Failed to send customer notification for invoice update: invoiceId={} exception={} message={}. Continuing gracefully.",
+                    invoice.getId(), e.getClass().getSimpleName(), SecureLogMessageConverter.sanitize(e.getMessage()));
         }
     }
 
@@ -79,7 +82,7 @@ public class CustomerNotificationEventListener {
     @EventListener
     public void handlePaymentRecorded(PaymentRecordedEvent event) {
         Invoice invoice = event.getInvoice();
-        log.info("Handling PaymentRecordedEvent for amount: {}", event.getAmount());
+        log.info("Handling PaymentRecordedEvent for invoice ID {}", invoice.getId());
 
         Map<String, Object> context = new HashMap<>();
         context.put("receivedAmount", event.getAmount());
@@ -96,14 +99,15 @@ public class CustomerNotificationEventListener {
                     context
             );
         } catch (Exception e) {
-            log.error("Failed to send customer notification for payment recorded: invoice ID={}. Continuing gracefully.", invoice.getId(), e);
+            log.error("Failed to send customer notification for payment recorded: invoiceId={} exception={} message={}. Continuing gracefully.",
+                    invoice.getId(), e.getClass().getSimpleName(), SecureLogMessageConverter.sanitize(e.getMessage()));
         }
     }
 
     @Async
     @EventListener
     public void handleAdvanceBalanceAvailable(AdvanceBalanceAvailableEvent event) {
-        log.info("Handling AdvanceBalanceAvailableEvent for client: {}", event.getClient().getName());
+        log.info("Handling AdvanceBalanceAvailableEvent for client ID {}", event.getClient().getId());
 
         Map<String, Object> context = new HashMap<>();
         context.put("advanceAmount", event.getAdvanceAmount());
@@ -117,7 +121,8 @@ public class CustomerNotificationEventListener {
                     context
             );
         } catch (Exception e) {
-            log.error("Failed to send customer notification for advance balance availability. Continuing gracefully.", e);
+            log.error("Failed to send customer notification for advance balance availability: clientId={} exception={} message={}. Continuing gracefully.",
+                    event.getClient().getId(), e.getClass().getSimpleName(), SecureLogMessageConverter.sanitize(e.getMessage()));
         }
     }
 }

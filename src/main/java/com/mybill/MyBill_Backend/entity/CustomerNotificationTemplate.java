@@ -30,7 +30,7 @@ public class CustomerNotificationTemplate {
     private String templateType; // INVOICE_GENERATED, PAYMENT_RECEIVED, PARTIAL_PAYMENT, etc.
 
     @Column(nullable = false)
-    private String channel; // WHATSAPP, EMAIL, SMS, etc.
+    private String channel; // WHATSAPP, SMS, etc.
 
     private String subject;
 

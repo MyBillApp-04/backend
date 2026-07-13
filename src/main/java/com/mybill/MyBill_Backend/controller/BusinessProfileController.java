@@ -2,6 +2,7 @@ package com.mybill.MyBill_Backend.controller;
 
 import com.mybill.MyBill_Backend.entity.BusinessProfile;
 import com.mybill.MyBill_Backend.exception.UploadException;
+import com.mybill.MyBill_Backend.observability.SecureLogMessageConverter;
 import com.mybill.MyBill_Backend.service.BusinessProfileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,12 +24,13 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -96,6 +98,7 @@ public class BusinessProfileController {
         }
 
         try {
+            ImageIO.setUseCache(false);
             Path dir = Paths.get(uploadDir).toAbsolutePath().normalize();
             Files.createDirectories(dir);
 
@@ -109,12 +112,13 @@ public class BusinessProfileController {
                         "The image could not be saved. Please try again.");
             }
 
-            Files.write(target, image.bytes());
+            writeNormalizedImageAtomically(image, target, prefix);
             return "/uploads/" + filename;
         } catch (UploadException | IllegalArgumentException e) {
             throw e;
         } catch (IOException e) {
-            log.error("Failed to process {} image upload", prefix, e);
+            log.error("Failed to process {} image upload: exception={} message={}",
+                    prefix, e.getClass().getSimpleName(), SecureLogMessageConverter.sanitize(e.getMessage()));
             throw new UploadException(HttpStatus.INTERNAL_SERVER_ERROR, "UPLOAD_STORAGE_FAILED",
                     "The image could not be saved. Please try again.", e);
         }
@@ -158,9 +162,13 @@ public class BusinessProfileController {
         boolean preserveTransparency = "signature".equals(kind)
                 || "qr".equals(kind)
                 || scaled.getColorModel().hasAlpha();
+        if (source != scaled) {
+            source.flush();
+        }
+
         return preserveTransparency
-                ? new NormalizedImage(encodePng(scaled), ".png")
-                : new NormalizedImage(encodeJpeg(scaled, 0.78f), ".jpg");
+                ? new NormalizedImage(scaled, ".png", 1.0f)
+                : new NormalizedImage(scaled, ".jpg", 0.78f);
     }
 
     private BufferedImage scaleToFit(BufferedImage source, int maxWidth, int maxHeight, boolean preserveAlpha) {
@@ -189,30 +197,58 @@ public class BusinessProfileController {
         return square;
     }
 
-    private byte[] encodePng(BufferedImage image) throws IOException {
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        if (!ImageIO.write(image, "png", output)) {
-            throw new IOException("PNG encoder is unavailable.");
+    private void writeNormalizedImage(NormalizedImage image, Path target) throws IOException {
+        try {
+            if (".png".equals(image.extension())) {
+                writePng(image.image(), target);
+            } else {
+                writeJpeg(image.image(), image.jpegQuality(), target);
+            }
+        } finally {
+            image.image().flush();
         }
-        return output.toByteArray();
     }
 
-    private byte[] encodeJpeg(BufferedImage image, float quality) throws IOException {
+    private void writeNormalizedImageAtomically(NormalizedImage image, Path target, String prefix) throws IOException {
+        Path tempFile = Files.createTempFile(target.getParent(), prefix + "-", image.extension() + ".tmp");
+        try {
+            writeNormalizedImage(image, tempFile);
+            try {
+                Files.move(tempFile, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (java.nio.file.AtomicMoveNotSupportedException ignored) {
+                Files.move(tempFile, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(tempFile);
+        }
+    }
+
+    private void writePng(BufferedImage image, Path target) throws IOException {
+        try (OutputStream output = Files.newOutputStream(target)) {
+            if (!ImageIO.write(image, "png", output)) {
+                throw new IOException("PNG encoder is unavailable.");
+            }
+        }
+    }
+
+    private void writeJpeg(BufferedImage image, float quality, Path target) throws IOException {
         BufferedImage rgb = image.getType() == BufferedImage.TYPE_INT_RGB ? image : scaleToFit(image, image.getWidth(), image.getHeight(), false);
         ImageWriter writer = ImageIO.getImageWritersByFormatName("jpeg").next();
-        try (ByteArrayOutputStream output = new ByteArrayOutputStream();
+        try (OutputStream output = Files.newOutputStream(target);
              ImageOutputStream stream = ImageIO.createImageOutputStream(output)) {
             writer.setOutput(stream);
             ImageWriteParam parameters = writer.getDefaultWriteParam();
             parameters.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
             parameters.setCompressionQuality(quality);
             writer.write(null, new IIOImage(rgb, null, null), parameters);
-            return output.toByteArray();
         } finally {
             writer.dispose();
+            if (rgb != image) {
+                rgb.flush();
+            }
         }
     }
 
-    private record NormalizedImage(byte[] bytes, String extension) {
+    private record NormalizedImage(BufferedImage image, String extension, float jpegQuality) {
     }
 }

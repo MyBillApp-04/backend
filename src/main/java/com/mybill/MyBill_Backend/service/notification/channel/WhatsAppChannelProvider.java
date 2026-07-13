@@ -16,10 +16,10 @@ public class WhatsAppChannelProvider implements NotificationChannelProvider {
 
     @Override
     public String sendNotification(String recipient, String subject, String body) throws Exception {
-        log.info("Sending WhatsApp Notification to: {}", recipient);
-        log.info("-------------------- WhatsApp Message Begin --------------------");
-        log.info("\n{}", body);
-        log.info("--------------------- WhatsApp Message End ---------------------");
+        log.info("Sending WhatsApp notification recipientPresent={} subjectPresent={} bodyLength={}",
+                recipient != null && !recipient.isBlank(),
+                subject != null && !subject.isBlank(),
+                body != null ? body.length() : 0);
         
         // Simulating WhatsApp API Gateway call (e.g. Meta Cloud API, Gupshup, or Twilio)
         // Here we just return a simulated JSON response with a unique message reference

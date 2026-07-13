@@ -23,6 +23,11 @@ import static org.mockito.Mockito.when;
 
 class FileServiceTest {
 
+    private static final String LOGO_FILENAME = "logo_123e4567-e89b-12d3-a456-426614174000.png";
+    private static final String OTHER_LOGO_FILENAME = "logo_123e4567-e89b-12d3-a456-426614174001.png";
+    private static final String QR_FILENAME = "qr_123e4567-e89b-12d3-a456-426614174002.jpg";
+    private static final String SIGNATURE_FILENAME = "signature_123e4567-e89b-12d3-a456-426614174003.png";
+
     private BusinessProfileRepository businessProfileRepository;
     private SecurityUtils securityUtils;
     private FileService fileService;
@@ -43,7 +48,7 @@ class FileServiceTest {
     @Test
     void loadFileAsResourceSucceedsWhenFileExistsAndIsOwned() throws IOException {
         Long userId = 42L;
-        String filename = "logo_42.png";
+        String filename = LOGO_FILENAME;
         Path file = tempDir.resolve(filename);
         Files.writeString(file, "test-content");
 
@@ -63,7 +68,7 @@ class FileServiceTest {
     @Test
     void loadFileAsResourceThrowsNotFoundWhenFileDoesNotExist() {
         Long userId = 42L;
-        String filename = "missing.png";
+        String filename = LOGO_FILENAME;
 
         BusinessProfile profile = BusinessProfile.builder()
                 .logoPath("/uploads/" + filename)
@@ -80,12 +85,12 @@ class FileServiceTest {
     @Test
     void loadFileAsResourceThrowsForbiddenWhenFileIsNotOwned() throws IOException {
         Long userId = 42L;
-        String filename = "unowned.png";
+        String filename = LOGO_FILENAME;
         Path file = tempDir.resolve(filename);
         Files.writeString(file, "test-content");
 
         BusinessProfile profile = BusinessProfile.builder()
-                .logoPath("/uploads/different.png")
+                .logoPath("/uploads/" + OTHER_LOGO_FILENAME)
                 .build();
 
         when(securityUtils.getCurrentUserId()).thenReturn(userId);
@@ -110,9 +115,7 @@ class FileServiceTest {
 
     @Test
     void detectsContentTypeCorrectly() {
-        assertThat(fileService.detectContentType("image.jpg")).isEqualTo("image/jpeg");
-        assertThat(fileService.detectContentType("image.jpeg")).isEqualTo("image/jpeg");
-        assertThat(fileService.detectContentType("image.png")).isEqualTo("image/png");
-        assertThat(fileService.detectContentType("file.bin")).isEqualTo("application/octet-stream");
+        assertThat(fileService.detectContentType(QR_FILENAME)).isEqualTo("image/jpeg");
+        assertThat(fileService.detectContentType(SIGNATURE_FILENAME)).isEqualTo("image/png");
     }
 }

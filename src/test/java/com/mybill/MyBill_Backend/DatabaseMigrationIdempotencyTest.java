@@ -38,7 +38,9 @@ class DatabaseMigrationIdempotencyTest {
         jdbc.execute("ALTER TABLE customer_notification_templates ALTER COLUMN is_deleted SET DEFAULT false");
         jdbc.execute("ALTER TABLE customer_notification_templates ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP");
         jdbc.execute("ALTER TABLE customer_notification_templates ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP");
-        jdbc.execute("ALTER TABLE email_templates ALTER COLUMN is_deleted SET DEFAULT false");
+        if (tableExists(jdbc, "email_templates")) {
+            jdbc.execute("ALTER TABLE email_templates ALTER COLUMN is_deleted SET DEFAULT false");
+        }
 
         flyway = Flyway.configure()
                 .dataSource(dataSource)
@@ -62,5 +64,14 @@ class DatabaseMigrationIdempotencyTest {
         // Run migrate a third time to verify it remains idempotent
         var migrateResult3 = flyway.migrate();
         assertThat(migrateResult3.migrationsExecuted).isZero();
+    }
+
+    private boolean tableExists(JdbcTemplate jdbc, String tableName) {
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.tables
+                WHERE lower(table_name) = lower(?)
+                """, Integer.class, tableName);
+        return count != null && count > 0;
     }
 }

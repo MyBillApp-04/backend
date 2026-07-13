@@ -14,28 +14,26 @@ public class CacheConfig {
 
     @Bean
     public CacheManager cacheManager(
-            @Value("${app.cache.dashboard.ttl-minutes:5}") long dashboardTtlMinutes
+            @Value("${app.cache.dashboard.ttl-minutes:5}") long dashboardTtlMinutes,
+            @Value("${app.cache.dashboard.max-size:100}") long dashboardMaxSize,
+            @Value("${app.cache.business-profiles.max-size:100}") long businessProfilesMaxSize,
+            @Value("${app.cache.invoice-settings.max-size:100}") long invoiceSettingsMaxSize
     ) {
         CaffeineCacheManager manager = new CaffeineCacheManager();
 
         manager.registerCustomCache("dashboardStats", Caffeine.newBuilder()
-                .maximumSize(1000)
+                .maximumSize(dashboardMaxSize)
                 .expireAfterWrite(Duration.ofMinutes(dashboardTtlMinutes))
                 .build());
 
         manager.registerCustomCache("businessProfiles", Caffeine.newBuilder()
-                .maximumSize(500)
+                .maximumSize(businessProfilesMaxSize)
                 .expireAfterWrite(Duration.ofHours(1))
                 .build());
 
         manager.registerCustomCache("invoiceSettings", Caffeine.newBuilder()
-                .maximumSize(500)
+                .maximumSize(invoiceSettingsMaxSize)
                 .expireAfterWrite(Duration.ofHours(1))
-                .build());
-
-        manager.registerCustomCache("emailTemplates", Caffeine.newBuilder()
-                .maximumSize(200)
-                .expireAfterWrite(Duration.ofHours(24))
                 .build());
 
         return manager;

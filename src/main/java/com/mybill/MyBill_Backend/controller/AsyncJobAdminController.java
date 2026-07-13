@@ -5,6 +5,8 @@ import com.mybill.MyBill_Backend.repository.AsyncJobRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -26,6 +28,9 @@ public class AsyncJobAdminController {
     @Value("${app.async-jobs.dlq-alert-threshold:10}")
     private int dlqAlertThreshold;
 
+    @Value("${app.async-jobs.admin-page-size:100}")
+    private int adminPageSize;
+
     @GetMapping("/admin/async-jobs")
     public String getDashboard(
             @RequestParam(value = "status", required = false) String status,
@@ -33,11 +38,13 @@ public class AsyncJobAdminController {
     ) {
         log.info("Accessing admin async jobs dashboard with status filter: {}", status);
 
+        int pageSize = Math.max(1, adminPageSize);
+        PageRequest pageRequest = PageRequest.of(0, pageSize, Sort.by(Sort.Direction.DESC, "createdAt"));
         List<AsyncJob> jobs;
         if (status != null && !status.isBlank()) {
-            jobs = asyncJobRepository.findByStatusOrderByCreatedAtDesc(status, org.springframework.data.domain.Pageable.unpaged()).getContent();
+            jobs = asyncJobRepository.findByStatusOrderByCreatedAtDesc(status, pageRequest).getContent();
         } else {
-            jobs = asyncJobRepository.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"));
+            jobs = asyncJobRepository.findAll(pageRequest).getContent();
         }
 
         long totalCount = asyncJobRepository.count();

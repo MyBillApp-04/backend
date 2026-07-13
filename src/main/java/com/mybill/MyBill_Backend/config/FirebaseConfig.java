@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
+import com.mybill.MyBill_Backend.observability.SecureLogMessageConverter;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,7 +52,8 @@ public class FirebaseConfig {
             logger.info("Firebase Admin SDK initialized successfully.");
 
         } catch (Exception exception) {
-            logger.error("Firebase Admin SDK initialization failed: {}", exception.getMessage());
+            logger.error("Firebase Admin SDK initialization failed: exception={} message={}",
+                    exception.getClass().getSimpleName(), SecureLogMessageConverter.sanitize(exception.getMessage()));
             throw new RuntimeException("Failed to initialize Firebase Admin SDK", exception);
         }
     }

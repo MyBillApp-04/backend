@@ -3,12 +3,14 @@ package com.mybill.MyBill_Backend.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import com.mybill.MyBill_Backend.observability.RequestCorrelationFilter;
+import com.mybill.MyBill_Backend.observability.SecureLogMessageConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.TransactionSystemException;
@@ -45,7 +47,7 @@ public class GlobalExceptionHandler {
             NotFoundException ex,
             HttpServletRequest request
     ) {
-        log.warn("Not found: {}", ex.getMessage());
+        log.warn("Not found: exception={}", ex.getClass().getSimpleName());
 
         return buildErrorResponse(
                 HttpStatus.NOT_FOUND,
@@ -60,7 +62,7 @@ public class GlobalExceptionHandler {
             Exception ex,
             HttpServletRequest request
     ) {
-        log.warn("Access denied: {}", ex.getMessage());
+        log.warn("Access denied: exception={}", ex.getClass().getSimpleName());
 
         return buildErrorResponse(
                 HttpStatus.FORBIDDEN,
@@ -75,7 +77,7 @@ public class GlobalExceptionHandler {
             ConflictException ex,
             HttpServletRequest request
     ) {
-        log.warn("Conflict: {}", ex.getMessage());
+        log.warn("Conflict: exception={}", ex.getClass().getSimpleName());
 
         return buildErrorResponse(
                 HttpStatus.CONFLICT,
@@ -90,7 +92,7 @@ public class GlobalExceptionHandler {
             FileStorageException ex,
             HttpServletRequest request
     ) {
-        log.error("File storage error: {}", ex.getMessage(), ex);
+        log.error("File storage error: exception={}", ex.getClass().getSimpleName());
 
         return buildErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
@@ -135,7 +137,7 @@ public class GlobalExceptionHandler {
             UploadException ex,
             HttpServletRequest request
     ) {
-        log.warn("Image upload failed [{}]: {}", ex.getCode(), ex.getMessage());
+        log.warn("Image upload failed: code={} exception={}", ex.getCode(), ex.getClass().getSimpleName());
         ResponseEntity<Map<String, Object>> response = buildErrorResponse(
                 ex.getStatus(), ex.getMessage(), request.getRequestURI(), ex);
         response.getBody().put("code", ex.getCode());
@@ -165,7 +167,7 @@ public class GlobalExceptionHandler {
             Exception ex,
             HttpServletRequest request
     ) {
-        log.warn("Malformed image upload: {}", ex.getMessage());
+        log.warn("Malformed image upload: exception={}", ex.getClass().getSimpleName());
         return buildErrorResponse(HttpStatus.BAD_REQUEST,
                 "Image upload format is invalid. Please choose the image again and retry.",
                 request.getRequestURI(),
@@ -178,7 +180,7 @@ public class GlobalExceptionHandler {
             Exception ex,
             HttpServletRequest request
     ) {
-        log.warn("Malformed request body for {}: {}", request.getRequestURI(), ex.getMessage());
+        log.warn("Malformed request body for {}: exception={}", request.getRequestURI(), ex.getClass().getSimpleName());
         return buildErrorResponse(HttpStatus.BAD_REQUEST,
                 "Request body is invalid. Please refresh and try again.",
                 request.getRequestURI(),
@@ -191,7 +193,7 @@ public class GlobalExceptionHandler {
             ConstraintViolationException ex,
             HttpServletRequest request
     ) {
-        log.warn("Constraint violation: {}", ex.getMessage());
+        log.warn("Constraint violation: exception={}", ex.getClass().getSimpleName());
 
         return buildErrorResponse(
                 HttpStatus.BAD_REQUEST,
@@ -234,7 +236,7 @@ public class GlobalExceptionHandler {
             IllegalArgumentException ex,
             HttpServletRequest request
     ) {
-        log.warn("Bad request: {}", ex.getMessage());
+        log.warn("Bad request: exception={}", ex.getClass().getSimpleName());
 
         return buildErrorResponse(
                 HttpStatus.BAD_REQUEST,
@@ -249,7 +251,7 @@ public class GlobalExceptionHandler {
             SecurityException ex,
             HttpServletRequest request
     ) {
-        log.warn("Security violation: {}", ex.getMessage());
+        log.warn("Security violation: exception={}", ex.getClass().getSimpleName());
 
         return buildErrorResponse(
                 HttpStatus.FORBIDDEN,
@@ -277,7 +279,7 @@ public class GlobalExceptionHandler {
             DataAccessException ex,
             HttpServletRequest request
     ) {
-        log.error("Database error", ex);
+        log.error("Database error: exception={}", ex.getClass().getSimpleName());
 
         return buildErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
@@ -292,7 +294,8 @@ public class GlobalExceptionHandler {
             DataIntegrityViolationException ex,
             HttpServletRequest request
     ) {
-        log.error("Database constraint violation for {}", request.getRequestURI(), ex);
+        log.error("Database constraint violation for {}: exception={}",
+                request.getRequestURI(), ex.getClass().getSimpleName());
 
         return buildErrorResponse(
                 HttpStatus.CONFLICT,
@@ -307,7 +310,7 @@ public class GlobalExceptionHandler {
             TransactionSystemException ex,
             HttpServletRequest request
     ) {
-        log.error("Database transaction commit failed", ex);
+        log.error("Database transaction commit failed: exception={}", ex.getClass().getSimpleName());
 
         return buildErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
@@ -322,7 +325,7 @@ public class GlobalExceptionHandler {
             RuntimeException ex,
             HttpServletRequest request
     ) {
-        log.error("Unexpected runtime exception", ex);
+        log.error("Unexpected runtime exception: exception={}", ex.getClass().getSimpleName());
 
         return buildErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
@@ -337,7 +340,7 @@ public class GlobalExceptionHandler {
             Exception ex,
             HttpServletRequest request
     ) {
-        log.error("Unexpected exception", ex);
+        log.error("Unexpected exception: exception={}", ex.getClass().getSimpleName());
 
         return buildErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
@@ -427,7 +430,9 @@ public class GlobalExceptionHandler {
         body.put("path", path);
         body.put("requestId", currentRequestId());
 
-        return ResponseEntity.status(status).body(body);
+        return ResponseEntity.status(status)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body);
     }
 
     private void logException(
@@ -439,15 +444,25 @@ public class GlobalExceptionHandler {
             Throwable ex
     ) {
         if (status.is5xxServerError()) {
-            log.error("api_error status={} path={} userId={} resourceId={} message={}",
-                    status.value(), path, userId, resourceId, message, ex);
+            log.error("api_error status={} path={} userId={} resourceId={} exception={} message={} requestId={}",
+                    status.value(), path, userId, resourceId,
+                    ex != null ? ex.getClass().getSimpleName() : "None",
+                    SecureLogMessageConverter.sanitize(message),
+                    currentRequestId());
             return;
         }
 
         log.warn("api_error status={} path={} userId={} resourceId={} exception={} message={}",
                 status.value(), path, userId, resourceId,
                 ex != null ? ex.getClass().getSimpleName() : "None",
-                message);
+                SecureLogMessageConverter.sanitize(message));
+    }
+
+    private String safeMessage(Throwable ex) {
+        if (ex == null || ex.getMessage() == null || ex.getMessage().isBlank()) {
+            return "n/a";
+        }
+        return SecureLogMessageConverter.sanitize(ex.getMessage());
     }
 
     private String currentRequestId() {

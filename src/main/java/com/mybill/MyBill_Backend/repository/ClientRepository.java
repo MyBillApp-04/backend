@@ -117,4 +117,22 @@ public interface ClientRepository extends JpaRepository<Client, UUID> {
             @Param("query") String query,
             Pageable pageable
     );
+    @Query("""
+           SELECT c FROM Client c
+           WHERE c.user.id = :userId
+             AND (c.updatedAt > :lastTime OR (c.updatedAt = :lastTime AND c.id > :lastId))
+           """)
+    Page<Client> findByUserIdWithKeyset(
+            @Param("userId") Long userId,
+            @Param("lastTime") LocalDateTime lastTime,
+            @Param("lastId") UUID lastId,
+            Pageable pageable
+    );
+
+    @Query("SELECT c FROM Client c WHERE c.user.id = :userId AND c.updatedAt >= :since")
+    Page<Client> findByUserIdAndUpdatedAtGreaterThanEqual(
+            @Param("userId") Long userId,
+            @Param("since") LocalDateTime since,
+            Pageable pageable
+    );
 }

@@ -38,6 +38,9 @@ public class SecurityConfig {
     @Value("${app.security.require-https:false}")
     private boolean requireHttps;
 
+    @Value("${app.security.public-api-docs:false}")
+    private boolean publicApiDocs;
+
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter,
             RateLimitFilter rateLimitFilter,
@@ -87,15 +90,17 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/api/auth/**", "/auth/**", "/error").permitAll()
                         .requestMatchers("/ping", "/api/auth/ping").permitAll()
-                        .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
+                        .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         // Public: update checks work before/after login; Image.network shows logo without Auth.
                         .requestMatchers(HttpMethod.GET, "/api/app-version").permitAll()
                         // Note: /uploads/** is intentionally NOT public. Files are served through
                         // /api/files/{filename} which requires JWT authentication (see FileController).
                         .requestMatchers("/admin/**", "/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/actuator/prometheus", "/actuator/metrics/**", "/actuator/caches/**", "/actuator/loggers/**").hasRole("ADMIN")
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
+                            .access((authentication, context) -> new org.springframework.security.authorization.AuthorizationDecision(publicApiDocs))
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().authenticated()
                 )

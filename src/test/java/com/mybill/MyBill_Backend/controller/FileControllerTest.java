@@ -30,10 +30,11 @@ class FileControllerTest {
 
     @Test
     void serveFileReturnsOkWithResourceAndHeaders() {
-        String filename = "logo_test.png";
+        String filename = "logo_123e4567-e89b-12d3-a456-426614174000.png";
         byte[] content = "fake image content".getBytes();
         Resource resource = new ByteArrayResource(content);
 
+        when(fileService.requireSafeUploadFilename(eq(filename))).thenReturn(filename);
         when(fileService.loadFileAsResource(eq(filename))).thenReturn(resource);
         when(fileService.detectContentType(eq(filename))).thenReturn("image/png");
 
@@ -48,7 +49,8 @@ class FileControllerTest {
 
     @Test
     void serveFilePropagatesNotFoundException() {
-        String filename = "missing.png";
+        String filename = "logo_123e4567-e89b-12d3-a456-426614174000.png";
+        when(fileService.requireSafeUploadFilename(eq(filename))).thenReturn(filename);
         when(fileService.loadFileAsResource(eq(filename)))
                 .thenThrow(new NotFoundException("File not found: " + filename));
 
@@ -59,7 +61,8 @@ class FileControllerTest {
 
     @Test
     void serveFilePropagatesForbiddenException() {
-        String filename = "other_user_logo.png";
+        String filename = "logo_123e4567-e89b-12d3-a456-426614174000.png";
+        when(fileService.requireSafeUploadFilename(eq(filename))).thenReturn(filename);
         when(fileService.loadFileAsResource(eq(filename)))
                 .thenThrow(new ForbiddenException("You do not have access to this file"));
 
@@ -70,7 +73,8 @@ class FileControllerTest {
 
     @Test
     void serveFilePropagatesFileStorageException() {
-        String filename = "corrupt.png";
+        String filename = "logo_123e4567-e89b-12d3-a456-426614174000.png";
+        when(fileService.requireSafeUploadFilename(eq(filename))).thenReturn(filename);
         when(fileService.loadFileAsResource(eq(filename)))
                 .thenThrow(new FileStorageException("File is not readable"));
 

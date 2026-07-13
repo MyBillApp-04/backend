@@ -11,7 +11,7 @@ WORKDIR /app
 
 ENV TZ=Asia/Kolkata
 ENV APP_TIME_ZONE=Asia/Kolkata
-ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/urandom"
+ENV JAVA_TOOL_OPTIONS="-Xms64m -Xmx256m -XX:+UseContainerSupport -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=48m -XX:MaxDirectMemorySize=32m -Xss512k -XX:ActiveProcessorCount=1 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xlog:gc*,safepoint:file=/tmp/mybill-gc.log:time,uptime,level,tags:filecount=3,filesize=5M -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/urandom"
 
 COPY --from=build --chown=nonroot:nonroot /workspace/target/MyBill_Backend-1.0.0.jar /app/app.jar
 COPY --from=build --chown=nonroot:nonroot /runtime/uploads /app/uploads

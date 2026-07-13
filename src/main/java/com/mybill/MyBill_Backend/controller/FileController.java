@@ -4,6 +4,7 @@ import com.mybill.MyBill_Backend.service.FileService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -43,13 +44,17 @@ public class FileController {
      */
     @GetMapping("/{filename:.+}")
     public ResponseEntity<Resource> serveFile(@PathVariable String filename) {
-        Resource resource = fileService.loadFileAsResource(filename);
-        String contentType = fileService.detectContentType(filename);
+        String safeFilename = fileService.requireSafeUploadFilename(filename);
+        Resource resource = fileService.loadFileAsResource(safeFilename);
+        String contentType = fileService.detectContentType(safeFilename);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(contentType))
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "inline; filename=\"" + filename + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition
+                        .inline()
+                        .filename(safeFilename)
+                        .build()
+                        .toString())
                 .header(HttpHeaders.CACHE_CONTROL, "private, max-age=3600")
                 .body(resource);
     }

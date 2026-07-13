@@ -1,12 +1,12 @@
 package com.mybill.MyBill_Backend.service.notification.channel;
 
 public interface NotificationChannelProvider {
-    String getChannelName(); // e.g. WHATSAPP, EMAIL, SMS
+    String getChannelName(); // e.g. WHATSAPP, SMS
 
     /**
      * Sends a message to a recipient.
-     * @param recipient The target recipient (e.g., phone number or email)
-     * @param subject Optional subject (for email)
+     * @param recipient The target recipient (for example phone number)
+     * @param subject Optional subject for channels that support one
      * @param body The content body of the message
      * @return Provider response string (JSON or transaction ID)
      * @throws Exception if sending fails

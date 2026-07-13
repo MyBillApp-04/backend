@@ -2,6 +2,7 @@ package com.mybill.MyBill_Backend.security;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -39,10 +40,16 @@ import java.util.HexFormat;
 @Component
 public class JwtTokenDenylist {
 
-    private final Cache<String, Boolean> deniedTokens = Caffeine.newBuilder()
-            .expireAfterWrite(Duration.ofHours(24))
-            .maximumSize(100_000)
-            .build();
+    private final Cache<String, Boolean> deniedTokens;
+
+    public JwtTokenDenylist(
+            @Value("${app.security.jwt-denylist.cache-max-size:10000}") long cacheMaxSize
+    ) {
+        this.deniedTokens = Caffeine.newBuilder()
+                .expireAfterWrite(Duration.ofHours(24))
+                .maximumSize(cacheMaxSize)
+                .build();
+    }
 
     public void deny(String token, Date expiresAt) {
         if (token == null || token.isBlank()) return;
