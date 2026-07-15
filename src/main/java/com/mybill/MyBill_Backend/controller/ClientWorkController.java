@@ -6,6 +6,8 @@ import com.mybill.MyBill_Backend.entity.ClientWork;
 import com.mybill.MyBill_Backend.service.ClientWorkService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -30,18 +32,18 @@ public class ClientWorkController {
     }
 
     @GetMapping("/client/{clientId}")
-    public List<ClientWorkDTO> getClientWork(@PathVariable UUID clientId) {
-        return workService.getClientWork(clientId);
+    public Page<ClientWorkDTO> getClientWork(@PathVariable UUID clientId, Pageable pageable) {
+        return workService.getClientWork(clientId, pageable);
     }
 
     @GetMapping("/all")
-    public List<ClientWorkDTO> getAllWork() {
-        return workService.getAllWork();
+    public Page<ClientWorkDTO> getAllWork(Pageable pageable) {
+        return workService.getAllWork(pageable);
     }
 
     @GetMapping("/unbilled/{clientId}")
-    public List<ClientWorkDTO> getUnbilledWorks(@PathVariable UUID clientId) {
-        return workService.getUnbilledWorks(clientId);
+    public Page<ClientWorkDTO> getUnbilledWorks(@PathVariable UUID clientId, Pageable pageable) {
+        return workService.getUnbilledWorks(clientId, pageable);
     }
 
     @GetMapping("/total/{clientId}")
@@ -71,7 +73,7 @@ public class ClientWorkController {
     @GetMapping("/sync")
     public List<ClientWorkDTO> getWorkUpdatedSince(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime since,
-            org.springframework.data.domain.Pageable pageable
+            Pageable pageable
     ) {
         return workService.getWorkUpdatedSince(since, pageable).getContent();
     }

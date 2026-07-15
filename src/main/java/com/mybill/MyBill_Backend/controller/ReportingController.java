@@ -5,6 +5,7 @@ import com.mybill.MyBill_Backend.dto.AdvancedReportDTO;
 import com.mybill.MyBill_Backend.service.ReportingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -14,6 +15,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/reports")
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "app.reports.backend-enabled", havingValue = "true", matchIfMissing = false)
 public class ReportingController {
 
     private final ReportingService reportingService;

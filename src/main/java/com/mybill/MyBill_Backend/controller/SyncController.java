@@ -11,11 +11,13 @@ import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
@@ -31,6 +33,9 @@ public class SyncController {
     private final SyncService syncService;
     private final ObjectMapper objectMapper;
     private final Validator validator;
+
+    @Value("${app.sync.max-decompressed-bytes:5242880}")
+    private long maxDecompressedBytes;
 
     @PostMapping
     public ResponseEntity<SyncResponse> sync(HttpServletRequest request) throws IOException {
@@ -51,11 +56,15 @@ public class SyncController {
             }
         }
 
+        inputStream = new BoundedInputStream(inputStream, maxDecompressedBytes);
+
         SyncRequest syncRequest;
         try {
             syncRequest = objectMapper.readValue(inputStream, SyncRequest.class);
         } catch (JsonProcessingException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Malformed sync JSON", e);
+        } catch (PayloadTooLargeException e) {
+            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Sync request body is too large", e);
         } catch (IOException e) {
             HttpStatus status = gzipped ? HttpStatus.UNSUPPORTED_MEDIA_TYPE : HttpStatus.BAD_REQUEST;
             throw new ResponseStatusException(status, "Unable to read sync request body", e);
@@ -83,5 +92,43 @@ public class SyncController {
         if (!violations.isEmpty()) {
             throw new ConstraintViolationException(violations);
         }
+    }
+
+    private static final class BoundedInputStream extends FilterInputStream {
+        private final long maxBytes;
+        private long bytesRead;
+
+        private BoundedInputStream(InputStream in, long maxBytes) {
+            super(in);
+            this.maxBytes = Math.max(1, maxBytes);
+        }
+
+        @Override
+        public int read() throws IOException {
+            int value = super.read();
+            if (value != -1) {
+                count(1);
+            }
+            return value;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            int count = super.read(b, off, len);
+            if (count > 0) {
+                count(count);
+            }
+            return count;
+        }
+
+        private void count(int count) throws PayloadTooLargeException {
+            bytesRead += count;
+            if (bytesRead > maxBytes) {
+                throw new PayloadTooLargeException();
+            }
+        }
+    }
+
+    private static final class PayloadTooLargeException extends IOException {
     }
 }

@@ -59,10 +59,25 @@ public class BusinessProfile {
     private String ifsc;
     private String upiId;
 
-    // Image paths stored on server and returned to client
+    // Image references returned to clients. New uploads use Cloudinary URLs and metadata.
     private String logoPath;
     private String qrImagePath;
     private String signaturePath;
+    private String logoPublicId;
+    private String logoResourceType;
+    private Integer logoWidth;
+    private Integer logoHeight;
+    private String logoFormat;
+    private String qrImagePublicId;
+    private String qrImageResourceType;
+    private Integer qrImageWidth;
+    private Integer qrImageHeight;
+    private String qrImageFormat;
+    private String signaturePublicId;
+    private String signatureResourceType;
+    private Integer signatureWidth;
+    private Integer signatureHeight;
+    private String signatureFormat;
 
     // Invoice customization & Settings
     @Column(columnDefinition = "text")

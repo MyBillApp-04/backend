@@ -6,11 +6,13 @@ import com.mybill.MyBill_Backend.repository.NotificationRepository;
 import com.mybill.MyBill_Backend.repository.UserRepository;
 import com.mybill.MyBill_Backend.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -23,20 +25,23 @@ public class NotificationService {
     private final SecurityUtils securityUtils;
 
     @Transactional(readOnly = true)
-    public List<Notification> getNotifications() {
+    public Page<Notification> getNotifications(Pageable pageable) {
         Long userId = securityUtils.getCurrentUserId();
-        return notificationRepository.findByUserIdAndIsDeletedFalseOrderByCreatedAtDesc(userId);
+        return notificationRepository.findByUserIdAndIsDeletedFalseOrderByCreatedAtDesc(userId, boundedPageable(pageable));
     }
 
     @Transactional(readOnly = true)
-    public List<Notification> getUnreadNotifications() {
+    public Page<Notification> getUnreadNotifications(Pageable pageable) {
         Long userId = securityUtils.getCurrentUserId();
-        return notificationRepository.findByUserIdAndIsReadFalseAndIsDeletedFalseOrderByCreatedAtDesc(userId);
+        return notificationRepository.findByUserIdAndIsReadFalseAndIsDeletedFalseOrderByCreatedAtDesc(
+                userId,
+                boundedPageable(pageable)
+        );
     }
 
     @Transactional(readOnly = true)
     public long getUnreadCount() {
-        return getUnreadNotifications().size();
+        return notificationRepository.countByUserIdAndIsReadFalseAndIsDeletedFalse(securityUtils.getCurrentUserId());
     }
 
     public Notification createNotification(String title, String message) {
@@ -74,14 +79,7 @@ public class NotificationService {
 
     public void markAllAsRead() {
         Long userId = securityUtils.getCurrentUserId();
-        List<Notification> unread = notificationRepository
-                .findByUserIdAndIsReadFalseAndIsDeletedFalseOrderByCreatedAtDesc(userId);
-        LocalDateTime now = LocalDateTime.now();
-        unread.forEach(n -> {
-            n.setIsRead(true);
-            n.setUpdatedAt(now);
-        });
-        notificationRepository.saveAll(unread);
+        notificationRepository.markUnreadAsReadForUser(userId, LocalDateTime.now());
     }
 
     public void deleteNotification(UUID notificationId) {
@@ -97,5 +95,11 @@ public class NotificationService {
         notification.setDeletedAt(LocalDateTime.now());
         notification.setUpdatedAt(LocalDateTime.now());
         notificationRepository.save(notification);
+    }
+
+    private Pageable boundedPageable(Pageable pageable) {
+        int page = pageable != null && pageable.isPaged() ? Math.max(0, pageable.getPageNumber()) : 0;
+        int size = pageable != null && pageable.isPaged() ? pageable.getPageSize() : 50;
+        return PageRequest.of(page, Math.max(1, Math.min(size, 100)));
     }
 }

@@ -23,7 +23,11 @@ public interface ClientWorkRepository extends JpaRepository<ClientWork, UUID> {
 
     List<ClientWork> findByClientIdAndUserIdAndIsDeletedFalse(UUID clientId, Long userId);
 
+    Page<ClientWork> findByClientIdAndUserIdAndIsDeletedFalse(UUID clientId, Long userId, Pageable pageable);
+
     List<ClientWork> findByClientIdAndBilledFalseAndUserIdAndIsDeletedFalse(UUID clientId, Long userId);
+
+    Page<ClientWork> findByClientIdAndBilledFalseAndUserIdAndIsDeletedFalse(UUID clientId, Long userId, Pageable pageable);
 
     List<ClientWork> findByInvoiceIdAndUserId(UUID invoiceId, Long userId);
 
@@ -34,6 +38,14 @@ public interface ClientWorkRepository extends JpaRepository<ClientWork, UUID> {
            ORDER BY w.date DESC, w.createdAt DESC
            """)
     List<ClientWork> findAllByUserIdOrderByDateDesc(@Param("userId") Long userId);
+
+    @Query("""
+           SELECT w FROM ClientWork w
+           WHERE w.user.id = :userId
+             AND w.isDeleted = false
+           ORDER BY w.date DESC, w.createdAt DESC
+           """)
+    Page<ClientWork> findAllByUserIdOrderByDateDesc(@Param("userId") Long userId, Pageable pageable);
 
     long countByBilledFalseAndUserIdAndIsDeletedFalse(Long userId);
 

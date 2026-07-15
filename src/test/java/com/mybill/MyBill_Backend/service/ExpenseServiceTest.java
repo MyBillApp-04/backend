@@ -11,11 +11,12 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -68,14 +69,14 @@ class ExpenseServiceTest {
     @Test
     void getExpensesForUserSuccess() {
         when(securityUtils.getCurrentUserId()).thenReturn(1L);
-        when(expenseRepository.findByUserIdAndIsDeletedFalseOrderByExpenseDateDesc(1L))
-                .thenReturn(Arrays.asList(mockExpense));
+        when(expenseRepository.findByUserIdAndIsDeletedFalseOrderByExpenseDateDesc(eq(1L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(mockExpense)));
 
-        List<Expense> expenses = expenseService.getExpensesForUser();
+        Page<Expense> expenses = expenseService.getExpensesForUser(Pageable.unpaged());
 
-        assertThat(expenses).hasSize(1);
-        assertThat(expenses.get(0).getDescription()).isEqualTo("Software Subscription");
-        verify(expenseRepository, times(1)).findByUserIdAndIsDeletedFalseOrderByExpenseDateDesc(1L);
+        assertThat(expenses.getContent()).hasSize(1);
+        assertThat(expenses.getContent().get(0).getDescription()).isEqualTo("Software Subscription");
+        verify(expenseRepository, times(1)).findByUserIdAndIsDeletedFalseOrderByExpenseDateDesc(eq(1L), any(Pageable.class));
     }
 
     @Test

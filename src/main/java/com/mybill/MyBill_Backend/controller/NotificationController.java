@@ -3,11 +3,12 @@ package com.mybill.MyBill_Backend.controller;
 import com.mybill.MyBill_Backend.entity.Notification;
 import com.mybill.MyBill_Backend.service.NotificationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -19,13 +20,13 @@ public class NotificationController {
     private final NotificationService notificationService;
 
     @GetMapping
-    public ResponseEntity<List<Notification>> getNotifications() {
-        return ResponseEntity.ok(notificationService.getNotifications());
+    public ResponseEntity<Page<Notification>> getNotifications(Pageable pageable) {
+        return ResponseEntity.ok(notificationService.getNotifications(pageable));
     }
 
     @GetMapping("/unread")
-    public ResponseEntity<List<Notification>> getUnreadNotifications() {
-        return ResponseEntity.ok(notificationService.getUnreadNotifications());
+    public ResponseEntity<Page<Notification>> getUnreadNotifications(Pageable pageable) {
+        return ResponseEntity.ok(notificationService.getUnreadNotifications(pageable));
     }
 
     @GetMapping("/unread/count")

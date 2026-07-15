@@ -3,6 +3,7 @@ package com.mybill.MyBill_Backend.service;
 import com.mybill.MyBill_Backend.observability.SecureLogMessageConverter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@ConditionalOnProperty(value = "app.scheduling.enabled", havingValue = "true", matchIfMissing = false)
 public class DatabaseMaintenanceService {
 
     private final JdbcTemplate jdbcTemplate;

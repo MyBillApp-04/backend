@@ -5,12 +5,14 @@ import com.mybill.MyBill_Backend.service.DatabaseLockService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "app.notifications.retry.enabled", havingValue = "true", matchIfMissing = false)
 public class CustomerNotificationRetryScheduler {
 
     private final CustomerNotificationService notificationService;

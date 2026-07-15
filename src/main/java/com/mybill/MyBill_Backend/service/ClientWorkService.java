@@ -11,6 +11,9 @@ import com.mybill.MyBill_Backend.util.SecurityUtils;
 import com.mybill.MyBill_Backend.exception.ForbiddenException;
 import com.mybill.MyBill_Backend.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,40 +32,38 @@ public class ClientWorkService {
     private final SecurityUtils securityUtils;
 
     @Transactional(readOnly = true)
-    public List<ClientWorkDTO> getClientWork(UUID clientId) {
+    public Page<ClientWorkDTO> getClientWork(UUID clientId, Pageable pageable) {
         Long userId = securityUtils.getCurrentUserId();
 
         clientRepository.findByIdAndUserId(clientId, userId)
                 .orElseThrow(() -> new ForbiddenException("Client not found or access denied"));
 
-        return workRepository.findByClientIdAndUserIdAndIsDeletedFalse(clientId, userId)
-                .stream()
-                .map(this::convertToDTO)
-                .toList();
+        return workRepository.findByClientIdAndUserIdAndIsDeletedFalse(
+                        clientId,
+                        userId,
+                        boundedPageable(pageable)
+                )
+                .map(this::convertToDTO);
     }
 
     @Transactional(readOnly = true)
-    public List<ClientWorkDTO> getAllWork() {
+    public Page<ClientWorkDTO> getAllWork(Pageable pageable) {
         Long userId = securityUtils.getCurrentUserId();
 
-        return workRepository.findAllByUserIdOrderByDateDesc(userId)
-                .stream()
-                .map(this::convertToDTO)
-                .toList();
+        return workRepository.findAllByUserIdOrderByDateDesc(userId, boundedPageable(pageable))
+                .map(this::convertToDTO);
     }
 
     @Transactional(readOnly = true)
-    public List<ClientWorkDTO> getUnbilledWorks(UUID clientId) {
+    public Page<ClientWorkDTO> getUnbilledWorks(UUID clientId, Pageable pageable) {
         Long userId = securityUtils.getCurrentUserId();
 
         clientRepository.findByIdAndUserId(clientId, userId)
                 .orElseThrow(() -> new ForbiddenException("Client not found or access denied"));
 
         return workRepository
-                .findByClientIdAndBilledFalseAndUserIdAndIsDeletedFalse(clientId, userId)
-                .stream()
-                .map(this::convertToDTO)
-                .toList();
+                .findByClientIdAndBilledFalseAndUserIdAndIsDeletedFalse(clientId, userId, boundedPageable(pageable))
+                .map(this::convertToDTO);
     }
 
     public ClientWork addWork(UUID clientId, ClientWork work) {
@@ -150,11 +151,17 @@ public class ClientWorkService {
     }
 
     @Transactional(readOnly = true)
-    public org.springframework.data.domain.Page<ClientWorkDTO> getWorkUpdatedSince(LocalDateTime since, org.springframework.data.domain.Pageable pageable) {
+    public Page<ClientWorkDTO> getWorkUpdatedSince(LocalDateTime since, Pageable pageable) {
         Long userId = securityUtils.getCurrentUserId();
 
-        return workRepository.findByUserIdAndUpdatedAtAfter(userId, since, pageable)
+        return workRepository.findByUserIdAndUpdatedAtAfter(userId, since, boundedPageable(pageable))
                 .map(this::convertToDTO);
+    }
+
+    private Pageable boundedPageable(Pageable pageable) {
+        int page = pageable != null && pageable.isPaged() ? Math.max(0, pageable.getPageNumber()) : 0;
+        int size = pageable != null && pageable.isPaged() ? pageable.getPageSize() : 50;
+        return PageRequest.of(page, Math.max(1, Math.min(size, 100)));
     }
 
     private Double calculateAmount(Double rate, Integer quantity) {

@@ -5,6 +5,7 @@ import com.mybill.MyBill_Backend.entity.User;
 import com.mybill.MyBill_Backend.repository.BusinessProfileRepository;
 import com.mybill.MyBill_Backend.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.cache.annotation.Cacheable;
@@ -21,9 +22,15 @@ public class BusinessProfileService {
     private static final Pattern UPLOAD_IMAGE_PATH = Pattern.compile(
             "^/uploads/(logo|qr|signature)_[0-9a-fA-F-]{36}\\.(png|jpg)$"
     );
+    private static final Pattern CLOUDINARY_URL = Pattern.compile(
+            "^https://res\\.cloudinary\\.com/[A-Za-z0-9_-]+/image/upload/.+"
+    );
 
     private final BusinessProfileRepository repository;
     private final SecurityUtils securityUtils;
+
+    @Value("${app.cloudinary.cloud-name:}")
+    private String cloudinaryCloudName;
 
     @Cacheable(value = "businessProfiles", key = "@securityUtils.getCurrentUserId()")
     public BusinessProfile getProfile() {
@@ -75,25 +82,31 @@ public class BusinessProfileService {
     @Transactional
     @CacheEvict(value = "businessProfiles", key = "@securityUtils.getCurrentUserId()")
     public BusinessProfile updateLogoPath(String path) {
-        return updateImagePath(path, ImageField.LOGO);
+        return updateImagePath(ImageMetadata.legacy(path), ImageField.LOGO);
     }
 
     @Transactional
     @CacheEvict(value = "businessProfiles", key = "@securityUtils.getCurrentUserId()")
     public BusinessProfile updateQrImagePath(String path) {
-        return updateImagePath(path, ImageField.QR);
+        return updateImagePath(ImageMetadata.legacy(path), ImageField.QR);
     }
 
     @Transactional
     @CacheEvict(value = "businessProfiles", key = "@securityUtils.getCurrentUserId()")
     public BusinessProfile updateSignaturePath(String path) {
-        return updateImagePath(path, ImageField.SIGNATURE);
+        return updateImagePath(ImageMetadata.legacy(path), ImageField.SIGNATURE);
     }
 
-    private BusinessProfile updateImagePath(String path, ImageField field) {
+    @Transactional
+    @CacheEvict(value = "businessProfiles", key = "@securityUtils.getCurrentUserId()")
+    public BusinessProfile updateCloudinaryImage(ImageMetadata metadata, ImageField field) {
+        return updateImagePath(metadata, field);
+    }
+
+    private BusinessProfile updateImagePath(ImageMetadata metadata, ImageField field) {
         Long userId = securityUtils.getCurrentUserId();
         User user = securityUtils.getCurrentUser();
-        String cleanPath = cleanUploadedImagePath(path);
+        ImageMetadata cleanMetadata = cleanImageMetadata(metadata);
 
         BusinessProfile profile = repository.findByUserId(userId).orElseGet(() -> {
             BusinessProfile p = new BusinessProfile();
@@ -103,9 +116,30 @@ public class BusinessProfileService {
         });
 
         switch (field) {
-            case LOGO -> profile.setLogoPath(cleanPath);
-            case QR -> profile.setQrImagePath(cleanPath);
-            case SIGNATURE -> profile.setSignaturePath(cleanPath);
+            case LOGO -> {
+                profile.setLogoPath(cleanMetadata.secureUrl());
+                profile.setLogoPublicId(cleanMetadata.publicId());
+                profile.setLogoResourceType(cleanMetadata.resourceType());
+                profile.setLogoWidth(cleanMetadata.width());
+                profile.setLogoHeight(cleanMetadata.height());
+                profile.setLogoFormat(cleanMetadata.format());
+            }
+            case QR -> {
+                profile.setQrImagePath(cleanMetadata.secureUrl());
+                profile.setQrImagePublicId(cleanMetadata.publicId());
+                profile.setQrImageResourceType(cleanMetadata.resourceType());
+                profile.setQrImageWidth(cleanMetadata.width());
+                profile.setQrImageHeight(cleanMetadata.height());
+                profile.setQrImageFormat(cleanMetadata.format());
+            }
+            case SIGNATURE -> {
+                profile.setSignaturePath(cleanMetadata.secureUrl());
+                profile.setSignaturePublicId(cleanMetadata.publicId());
+                profile.setSignatureResourceType(cleanMetadata.resourceType());
+                profile.setSignatureWidth(cleanMetadata.width());
+                profile.setSignatureHeight(cleanMetadata.height());
+                profile.setSignatureFormat(cleanMetadata.format());
+            }
         }
 
         return repository.saveAndFlush(profile);
@@ -158,10 +192,32 @@ public class BusinessProfileService {
     private String cleanUploadedImagePath(String value) {
         String cleanValue = clean(value);
         if (cleanValue == null) return null;
-        if (!UPLOAD_IMAGE_PATH.matcher(cleanValue).matches()) {
+        if (!UPLOAD_IMAGE_PATH.matcher(cleanValue).matches() && !CLOUDINARY_URL.matcher(cleanValue).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid uploaded image path");
         }
         return cleanValue;
+    }
+
+    private ImageMetadata cleanImageMetadata(ImageMetadata metadata) {
+        if (metadata == null) {
+            return ImageMetadata.legacy(null);
+        }
+        String secureUrl = cleanUploadedImagePath(metadata.secureUrl());
+        String publicId = clean(metadata.publicId());
+        String resourceType = clean(metadata.resourceType());
+        String format = clean(metadata.format());
+        if (secureUrl != null && CLOUDINARY_URL.matcher(secureUrl).matches() && publicId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cloudinary publicId is required");
+        }
+        if (secureUrl != null && CLOUDINARY_URL.matcher(secureUrl).matches()
+                && cloudinaryCloudName != null && !cloudinaryCloudName.isBlank()
+                && !secureUrl.startsWith("https://res.cloudinary.com/" + cloudinaryCloudName.trim() + "/")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cloudinary image URL is not from the configured cloud");
+        }
+        if (resourceType != null && !"image".equals(resourceType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only Cloudinary image resources are supported");
+        }
+        return new ImageMetadata(secureUrl, publicId, resourceType, metadata.width(), metadata.height(), format);
     }
 
     private String required(String value, String fallback) {
@@ -169,9 +225,22 @@ public class BusinessProfileService {
         return cleanValue != null ? cleanValue : fallback;
     }
 
-    private enum ImageField {
+    public enum ImageField {
         LOGO,
         QR,
         SIGNATURE
+    }
+
+    public record ImageMetadata(
+            String secureUrl,
+            String publicId,
+            String resourceType,
+            Integer width,
+            Integer height,
+            String format
+    ) {
+        static ImageMetadata legacy(String path) {
+            return new ImageMetadata(path, null, null, null, null, null);
+        }
     }
 }

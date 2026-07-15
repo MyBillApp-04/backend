@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -18,6 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@ConditionalOnProperty(value = "app.scheduling.enabled", havingValue = "true", matchIfMissing = false)
 public class RecurringInvoiceScheduler {
 
     private final RecurringInvoiceScheduleRepository scheduleRepository;

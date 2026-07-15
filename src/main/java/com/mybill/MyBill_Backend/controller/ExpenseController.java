@@ -5,11 +5,12 @@ import com.mybill.MyBill_Backend.entity.Expense;
 import com.mybill.MyBill_Backend.service.ExpenseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -20,12 +21,8 @@ public class ExpenseController {
     private final ExpenseService expenseService;
 
     @GetMapping
-    public ResponseEntity<List<ExpenseDTO>> getExpenses() {
-        List<ExpenseDTO> dtos = expenseService.getExpensesForUser()
-                .stream()
-                .map(this::toDTO)
-                .toList();
-        return ResponseEntity.ok(dtos);
+    public ResponseEntity<Page<ExpenseDTO>> getExpenses(Pageable pageable) {
+        return ResponseEntity.ok(expenseService.getExpensesForUser(pageable).map(this::toDTO));
     }
 
     @GetMapping("/{id}")

@@ -9,12 +9,17 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 /**
  * Provides authenticated access to uploaded business files (logo, QR code, signature).
  *
  * <p>This controller replaces the former public {@code /uploads/**} static resource handler.
  * Every request requires a valid JWT token and ownership of the referenced file.
+ *
+ * <p>LEGACY FALLBACK: New images use Cloudinary secure URLs. This controller only
+ * remains for old business profiles that still reference local `/uploads/...` paths.
+ * Can be safely disabled via `app.legacy-files.enabled=false` once fully migrated.
  *
  * <p>Endpoint: {@code GET /api/files/{filename}}
  *
@@ -31,6 +36,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/files")
 @RequiredArgsConstructor
 @Slf4j
+@ConditionalOnProperty(name = "app.legacy-files.enabled", havingValue = "true", matchIfMissing = true)
 public class FileController {
 
     private final FileService fileService;

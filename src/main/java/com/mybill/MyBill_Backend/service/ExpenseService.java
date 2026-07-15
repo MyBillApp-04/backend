@@ -8,11 +8,13 @@ import com.mybill.MyBill_Backend.repository.UserRepository;
 import com.mybill.MyBill_Backend.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -25,9 +27,15 @@ public class ExpenseService {
     private final SecurityUtils securityUtils;
 
     @Transactional(readOnly = true)
-    public List<Expense> getExpensesForUser() {
+    public Page<Expense> getExpensesForUser(Pageable pageable) {
         Long userId = securityUtils.getCurrentUserId();
-        return expenseRepository.findByUserIdAndIsDeletedFalseOrderByExpenseDateDesc(userId);
+        return expenseRepository.findByUserIdAndIsDeletedFalseOrderByExpenseDateDesc(userId, boundedPageable(pageable));
+    }
+
+    private Pageable boundedPageable(Pageable pageable) {
+        int page = pageable != null && pageable.isPaged() ? Math.max(0, pageable.getPageNumber()) : 0;
+        int size = pageable != null && pageable.isPaged() ? pageable.getPageSize() : 50;
+        return PageRequest.of(page, Math.max(1, Math.min(size, 100)));
     }
 
     @Transactional(readOnly = true)

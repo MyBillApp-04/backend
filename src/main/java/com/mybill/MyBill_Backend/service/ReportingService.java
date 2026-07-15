@@ -312,6 +312,7 @@ public class ReportingService {
                   AND i.invoice_date >= :start
                   AND i.invoice_date <= :end
                 ORDER BY i.due_date ASC
+                LIMIT 500
                 """)
                 .setParameter("userId", userId)
                 .setParameter("targetDate", targetDate)
@@ -390,6 +391,7 @@ public class ReportingService {
                   AND i.invoice_date >= :start
                   AND i.invoice_date <= :end
                 ORDER BY i.due_date ASC
+                LIMIT 500
                 """)
                 .setParameter("userId", userId)
                 .setParameter("targetDate", targetDate)
