@@ -1,0 +1,16 @@
+ALTER TABLE business_profile
+    ADD COLUMN IF NOT EXISTS logo_public_id varchar(255),
+    ADD COLUMN IF NOT EXISTS logo_resource_type varchar(32),
+    ADD COLUMN IF NOT EXISTS logo_width integer,
+    ADD COLUMN IF NOT EXISTS logo_height integer,
+    ADD COLUMN IF NOT EXISTS logo_format varchar(32),
+    ADD COLUMN IF NOT EXISTS qr_image_public_id varchar(255),
+    ADD COLUMN IF NOT EXISTS qr_image_resource_type varchar(32),
+    ADD COLUMN IF NOT EXISTS qr_image_width integer,
+    ADD COLUMN IF NOT EXISTS qr_image_height integer,
+    ADD COLUMN IF NOT EXISTS qr_image_format varchar(32),
+    ADD COLUMN IF NOT EXISTS signature_public_id varchar(255),
+    ADD COLUMN IF NOT EXISTS signature_resource_type varchar(32),
+    ADD COLUMN IF NOT EXISTS signature_width integer,
+    ADD COLUMN IF NOT EXISTS signature_height integer,
+    ADD COLUMN IF NOT EXISTS signature_format varchar(32);
