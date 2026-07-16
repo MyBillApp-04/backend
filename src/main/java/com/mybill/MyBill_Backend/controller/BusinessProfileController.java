@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.constraints.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -76,11 +77,28 @@ public class BusinessProfileController {
     }
 
     public record CloudinaryImageMetadataRequest(
+            @NotBlank(message = "secureUrl is required")
+            @Size(max = 2000, message = "secureUrl is too long")
             String secureUrl,
+
+            @NotBlank(message = "publicId is required")
+            @Size(max = 500, message = "publicId is too long")
             String publicId,
+
+            @NotBlank(message = "resourceType is required")
+            @Size(max = 100, message = "resourceType is too long")
             String resourceType,
+
+            @Min(value = 1, message = "width must be positive")
+            @Max(value = 10000, message = "width is too large")
             Integer width,
+
+            @Min(value = 1, message = "height must be positive")
+            @Max(value = 10000, message = "height is too large")
             Integer height,
+
+            @NotBlank(message = "format is required")
+            @Size(max = 50, message = "format is too long")
             String format
     ) {
     }

@@ -22,7 +22,7 @@ services:
       dockerfile: Dockerfile
     container_name: mybill-backend
     env_file:
-      - path: .env
+      - path: ../../Secrets/.env
         required: false
     environment:
       SPRING_PROFILES_ACTIVE: dev

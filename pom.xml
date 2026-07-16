@@ -23,7 +23,6 @@
         <lombok.version>1.18.46</lombok.version>
         <jjwt.version>0.13.0</jjwt.version>
         <firebase-admin.version>9.10.0</firebase-admin.version>
-        <spring-dotenv.version>4.0.0</spring-dotenv.version>
         <postgresql.version>42.7.13</postgresql.version>
         <caffeine.version>3.2.4</caffeine.version>
         <tomcat.version>10.1.57</tomcat.version>
@@ -112,12 +111,6 @@
                     <artifactId>commons-logging</artifactId>
                 </exclusion>
             </exclusions>
-        </dependency>
-
-        <dependency>
-            <groupId>me.paulschwarz</groupId>
-            <artifactId>spring-dotenv</artifactId>
-            <version>${spring-dotenv.version}</version>
         </dependency>
 
         <dependency>

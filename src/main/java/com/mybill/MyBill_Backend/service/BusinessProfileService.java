@@ -206,8 +206,19 @@ public class BusinessProfileService {
         String publicId = clean(metadata.publicId());
         String resourceType = clean(metadata.resourceType());
         String format = clean(metadata.format());
-        if (secureUrl != null && CLOUDINARY_URL.matcher(secureUrl).matches() && publicId == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cloudinary publicId is required");
+        if (secureUrl != null && CLOUDINARY_URL.matcher(secureUrl).matches()) {
+            if (publicId == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cloudinary publicId is required");
+            }
+            Long userId = securityUtils.getCurrentUserId();
+            String expectedPrefix = "mybill/" + userId + "/";
+            if (!publicId.startsWith(expectedPrefix)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied: Cloudinary resource folder mismatch");
+            }
+            String encodedPublicId = publicId.replace("/", "%2F");
+            if (!secureUrl.contains(publicId) && !secureUrl.contains(encodedPublicId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cloudinary secureUrl does not match publicId");
+            }
         }
         if (secureUrl != null && CLOUDINARY_URL.matcher(secureUrl).matches()
                 && cloudinaryCloudName != null && !cloudinaryCloudName.isBlank()

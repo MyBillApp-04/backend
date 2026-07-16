@@ -2,6 +2,7 @@ package com.mybill.MyBill_Backend.service;
 
 import com.mybill.MyBill_Backend.dto.ClientSummaryProjection;
 import com.mybill.MyBill_Backend.dto.ClientWorkDTO;
+import com.mybill.MyBill_Backend.dto.ClientWorkRequest;
 import com.mybill.MyBill_Backend.entity.Client;
 import com.mybill.MyBill_Backend.entity.ClientWork;
 import com.mybill.MyBill_Backend.repository.ClientRepository;
@@ -66,7 +67,7 @@ public class ClientWorkService {
                 .map(this::convertToDTO);
     }
 
-    public ClientWork addWork(UUID clientId, ClientWork work) {
+    public ClientWork addWork(UUID clientId, ClientWorkRequest request) {
         Long userId = securityUtils.getCurrentUserId();
 
         Client client = clientRepository.findByIdAndUserId(clientId, userId)
@@ -74,12 +75,12 @@ public class ClientWorkService {
 
         LocalDateTime now = LocalDateTime.now();
 
-        if (work.getId() == null) {
-            work.setId(UUID.randomUUID());
-        }
+        ClientWork work = new ClientWork();
+        work.setId(request.getId() != null ? request.getId() : UUID.randomUUID());
+        work.setDescription(request.getDescription());
 
-        Integer quantity = work.getQuantity() != null ? work.getQuantity() : 1;
-        Double rate = work.getRate() != null ? work.getRate() : 0.0;
+        Integer quantity = request.getQuantity() != null ? request.getQuantity() : 1;
+        Double rate = request.getRate() != null ? request.getRate() : 0.0;
 
         work.setQuantity(quantity);
         work.setRate(rate);
@@ -87,39 +88,40 @@ public class ClientWorkService {
 
         work.setClient(client);
         work.setUser(securityUtils.getCurrentUser());
-        work.setDate(work.getDate() != null ? work.getDate() : now);
-        work.setCreatedAt(work.getCreatedAt() != null ? work.getCreatedAt() : now);
+        work.setDate(request.getDate() != null ? request.getDate() : now);
+        work.setCreatedAt(now);
         work.setUpdatedAt(now);
-        work.setBilled(work.getBilled() != null ? work.getBilled() : false);
-        work.setIsDeleted(work.getIsDeleted() != null ? work.getIsDeleted() : false);
-        work.setVersion(work.getVersion() != null ? work.getVersion() : 1);
+        work.setBilled(false);
+        work.setIsDeleted(false);
+        work.setVersion(1);
+        work.setDeviceId(request.getDeviceId());
 
         return workRepository.save(work);
     }
 
-    public ClientWork updateWork(UUID workId, ClientWork updatedWork) {
+    public ClientWork updateWork(UUID workId, ClientWorkRequest request) {
         Long userId = securityUtils.getCurrentUserId();
 
         ClientWork existing = workRepository.findByIdAndUserId(workId, userId)
                 .orElseThrow(() -> new NotFoundException("Work not found or access denied"));
 
-        Integer quantity = updatedWork.getQuantity() != null
-                ? updatedWork.getQuantity()
+        Integer quantity = request.getQuantity() != null
+                ? request.getQuantity()
                 : existing.getQuantity();
 
-        Double rate = updatedWork.getRate() != null
-                ? updatedWork.getRate()
+        Double rate = request.getRate() != null
+                ? request.getRate()
                 : existing.getRate();
 
-        existing.setDescription(updatedWork.getDescription());
+        existing.setDescription(request.getDescription());
         existing.setRate(rate);
         existing.setQuantity(quantity);
         existing.setAmount(calculateAmount(rate, quantity));
-        existing.setDeviceId(updatedWork.getDeviceId());
+        existing.setDeviceId(request.getDeviceId());
         existing.setUpdatedAt(LocalDateTime.now());
 
-        if (updatedWork.getDate() != null) {
-            existing.setDate(updatedWork.getDate());
+        if (request.getDate() != null) {
+            existing.setDate(request.getDate());
         }
 
         return workRepository.save(existing);

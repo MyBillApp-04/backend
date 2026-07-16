@@ -153,19 +153,20 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private String clientIp(HttpServletRequest request) {
         if (trustForwardedHeaders) {
-            String forwardedFor = request.getHeader("X-Forwarded-For");
-            if (forwardedFor != null && !forwardedFor.isBlank()) {
-                String firstHop = forwardedFor.split(",")[0].trim().toLowerCase(Locale.ROOT);
-                if (isValidIpAddress(firstHop)) {
-                    return firstHop;
-                }
-            }
-
             String realIp = request.getHeader("X-Real-IP");
             if (realIp != null && !realIp.isBlank()) {
                 String candidate = realIp.trim().toLowerCase(Locale.ROOT);
                 if (isValidIpAddress(candidate)) {
                     return candidate;
+                }
+            }
+
+            String forwardedFor = request.getHeader("X-Forwarded-For");
+            if (forwardedFor != null && !forwardedFor.isBlank()) {
+                String[] hops = forwardedFor.split(",");
+                String lastHop = hops[hops.length - 1].trim().toLowerCase(Locale.ROOT);
+                if (isValidIpAddress(lastHop)) {
+                    return lastHop;
                 }
             }
         }

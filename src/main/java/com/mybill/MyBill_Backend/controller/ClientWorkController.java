@@ -2,6 +2,7 @@ package com.mybill.MyBill_Backend.controller;
 
 import com.mybill.MyBill_Backend.dto.ClientSummaryProjection;
 import com.mybill.MyBill_Backend.dto.ClientWorkDTO;
+import com.mybill.MyBill_Backend.dto.ClientWorkRequest;
 import com.mybill.MyBill_Backend.entity.ClientWork;
 import com.mybill.MyBill_Backend.service.ClientWorkService;
 import jakarta.validation.Valid;
@@ -26,9 +27,9 @@ public class ClientWorkController {
     @ResponseStatus(HttpStatus.CREATED)
     public ClientWork addWork(
             @PathVariable UUID clientId,
-            @Valid @RequestBody ClientWork work
+            @Valid @RequestBody ClientWorkRequest workRequest
     ) {
-        return workService.addWork(clientId, work);
+        return workService.addWork(clientId, workRequest);
     }
 
     @GetMapping("/client/{clientId}")
@@ -59,9 +60,9 @@ public class ClientWorkController {
     @PutMapping("/{workId}")
     public ClientWork updateWork(
             @PathVariable UUID workId,
-            @Valid @RequestBody ClientWork work
+            @Valid @RequestBody ClientWorkRequest workRequest
     ) {
-        return workService.updateWork(workId, work);
+        return workService.updateWork(workId, workRequest);
     }
 
     @DeleteMapping("/{workId}")

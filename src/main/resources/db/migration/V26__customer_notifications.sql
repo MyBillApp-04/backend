@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS public.customer_notification_settings (
 CREATE TABLE IF NOT EXISTS public.customer_notification_templates (
     id uuid PRIMARY KEY,
     user_id bigint REFERENCES public.users(id) ON DELETE CASCADE,
-    template_type varchar(50) NOT NULL, -- INVOICE_GENERATED, PAYMENT_RECEIVED, PARTIAL_PAYMENT, INVOICE_UPDATED, ADVANCE_BALANCE, PAYMENT_REMINDER
-    channel varchar(50) NOT NULL, -- WHATSAPP, EMAIL, SMS, PUSH
+    template_type varchar(50) NOT NULL, /* INVOICE_GENERATED, PAYMENT_RECEIVED, PARTIAL_PAYMENT, INVOICE_UPDATED, ADVANCE_BALANCE, PAYMENT_REMINDER */
+    channel varchar(50) NOT NULL, /* WHATSAPP, EMAIL, SMS, PUSH */
     subject varchar(255),
     message_body text NOT NULL,
     is_deleted boolean NOT NULL DEFAULT false,
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS public.customer_notification_logs (
     phone_number varchar(50) NOT NULL,
     notification_type varchar(50) NOT NULL,
     channel varchar(50) NOT NULL,
-    status varchar(50) NOT NULL, -- PENDING, SENT, FAILED, RETRYING
+    status varchar(50) NOT NULL, /* PENDING, SENT, FAILED, RETRYING */
     created_time timestamp without time zone NOT NULL DEFAULT now(),
     sent_time timestamp without time zone,
     failure_reason text,

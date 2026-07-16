@@ -523,7 +523,7 @@
                             <span th:text="${job.attemptCount + '/' + job.maxAttempts}">0/5</span>
                         </td>
                         <td>
-                            <div class="error-text" th:if="${job.lastError != null}" th:title="${job.lastError}" th:text="${job.lastError}">
+                            <div class="error-text" th:if="${job.lastError != null}" th:title="${job.lastError}" th:text="${#strings.abbreviate(job.lastError, 200)}">
                                 Connection refused
                             </div>
                             <span th:if="${job.lastError == null}" style="color: var(--text-secondary)">None</span>
