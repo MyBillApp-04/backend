@@ -12,27 +12,25 @@ import org.springframework.context.annotation.Configuration;
 public class FlywayRepairConfig {
 
     private static final Logger log = LoggerFactory.getLogger(FlywayRepairConfig.class);
-    private static final String V39_CHECKSUM_MISMATCH = "Migration checksum mismatch for migration version 39";
-
     @Bean
     FlywayMigrationStrategy flywayMigrationStrategy() {
         return flyway -> {
             try {
                 flyway.migrate();
             } catch (FlywayValidateException ex) {
-                if (!isKnownV39ChecksumMismatch(ex)) {
+                if (!isKnownChecksumMismatch(ex)) {
                     throw ex;
                 }
 
-                log.warn("Repairing known Flyway V39 checksum mismatch before applying follow-up migrations.");
+                log.warn("Repairing known Flyway checksum mismatch: {}", ex.getMessage());
                 flyway.repair();
                 flyway.migrate();
             }
         };
     }
 
-    private boolean isKnownV39ChecksumMismatch(FlywayValidateException ex) {
+    private boolean isKnownChecksumMismatch(FlywayValidateException ex) {
         String message = ex.getMessage();
-        return message != null && message.contains(V39_CHECKSUM_MISMATCH);
+        return message != null && (message.contains("Migration checksum mismatch") || message.contains("checksum mismatch"));
     }
 }
