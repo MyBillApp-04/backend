@@ -22,7 +22,8 @@ public class FlywayRepairConfig {
                     throw ex;
                 }
 
-                log.warn("Repairing known Flyway checksum mismatch: {}", ex.getMessage());
+                log.info("Repairing known Flyway checksum mismatch before migration.");
+                log.debug("Flyway checksum mismatch details: {}", ex.getMessage());
                 flyway.repair();
                 flyway.migrate();
             }
