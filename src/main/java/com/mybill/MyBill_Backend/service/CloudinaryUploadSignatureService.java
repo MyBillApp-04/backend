@@ -48,7 +48,7 @@ public class CloudinaryUploadSignatureService {
         String signature = sha1("folder=" + folder
                 + "&public_id=" + publicId
                 + "&timestamp=" + timestamp
-                + apiSecret);
+                + apiSecret.trim());
 
         return new CloudinarySignature(cloudName, apiKey, timestamp, folder, publicId, signature);
     }
