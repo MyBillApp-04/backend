@@ -12,4 +12,5 @@ public class GlobalSearchResponse {
     private List<Map<String, Object>> clients;
     private List<Map<String, Object>> works;
     private List<Map<String, Object>> invoices;
+    private List<Map<String, Object>> quotations;
 }

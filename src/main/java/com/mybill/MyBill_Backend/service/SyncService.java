@@ -44,6 +44,9 @@ public class SyncService {
     private final PlatformTransactionManager transactionManager;
     private final InvoiceNumberService invoiceNumberService;
     private final ApplicationEventPublisher eventPublisher;
+    private final QuotationRepository quotationRepository;
+    private final QuotationItemRepository quotationItemRepository;
+    private final QuotationService quotationService;
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @CacheEvict(value = "dashboardStats", allEntries = true)
@@ -167,6 +170,16 @@ public class SyncService {
                     applied = le != null;
                     if (applied) ledgerEntryRepository.saveAndFlush(le);
                 }
+                case "quotation" -> {
+                    Quotation q = buildQuotation(change, managedUser, userId, deviceId, serverTime, conflictPolicy);
+                    applied = q != null;
+                    if (applied) quotationRepository.saveAndFlush(q);
+                }
+                case "quotation_item" -> {
+                    QuotationItem qi = buildQuotationItem(change, managedUser, userId, deviceId, serverTime);
+                    applied = qi != null;
+                    if (applied) quotationItemRepository.saveAndFlush(qi);
+                }
                 default -> throw new RuntimeException("Unsupported entity type: " + change.getEntityType());
             }
             return applied;
@@ -261,7 +274,9 @@ public class SyncService {
                     case "invoice" -> 2;
                     case "invoice_item" -> 3;
                     case "ledger_entry" -> 4;
-                    default -> 4;
+                    case "quotation" -> 5;
+                    case "quotation_item" -> 6;
+                    default -> 7;
                 }))
                 .toList();
     }
@@ -396,11 +411,43 @@ public class SyncService {
             cursor.put("ledger_entry", null, null, false);
         }
 
+        // Quotations
+        EntityCursor qc = cursor.get("quotation");
+        Page<Quotation> quotationPage;
+        if (qc != null && qc.time != null && qc.id != null) {
+            quotationPage = quotationRepository.findByUserIdWithKeyset(userId, qc.time, qc.id, pageable);
+        } else {
+            quotationPage = since == null ? quotationRepository.findByUserId(userId, pageable) : quotationRepository.findByUserIdAndUpdatedAtGreaterThanEqual(userId, since, pageable);
+        }
+        if (!quotationPage.isEmpty()) {
+            Quotation last = quotationPage.getContent().get(quotationPage.getContent().size() - 1);
+            cursor.put("quotation", last.getUpdatedAt(), last.getId(), quotationPage.hasNext());
+        } else {
+            cursor.put("quotation", null, null, false);
+        }
+
+        // Quotation Items
+        EntityCursor qic = cursor.get("quotation_item");
+        Page<QuotationItem> quotationItemPage;
+        if (qic != null && qic.time != null && qic.id != null) {
+            quotationItemPage = quotationItemRepository.findByUserIdWithKeyset(userId, qic.time, qic.id, pageable);
+        } else {
+            quotationItemPage = since == null ? quotationItemRepository.findByUserId(userId, pageable) : quotationItemRepository.findByUserIdAndUpdatedAtGreaterThanEqual(userId, since, pageable);
+        }
+        if (!quotationItemPage.isEmpty()) {
+            QuotationItem last = quotationItemPage.getContent().get(quotationItemPage.getContent().size() - 1);
+            cursor.put("quotation_item", last.getUpdatedAt(), last.getId(), quotationItemPage.hasNext());
+        } else {
+            cursor.put("quotation_item", null, null, false);
+        }
+
         changes.put("clients", clientPage.getContent().stream().map(this::clientToMap).toList());
         changes.put("works", workPage.getContent().stream().map(this::workToMap).toList());
         changes.put("invoices", invoicePage.getContent().stream().map(this::invoiceToMap).toList());
         changes.put("invoiceItems", itemPage.getContent().stream().map(this::invoiceItemToMap).toList());
         changes.put("ledgerEntries", ledgerPage.getContent().stream().map(this::ledgerEntryToMap).toList());
+        changes.put("quotations", quotationPage.getContent().stream().map(this::quotationToMap).toList());
+        changes.put("quotationItems", quotationItemPage.getContent().stream().map(this::quotationItemToMap).toList());
 
         boolean hasMore = cursor.hasMoreOverall();
         String nextCursor = hasMore ? cursor.encode() : null;
@@ -949,6 +996,167 @@ public class SyncService {
         m.put("description", item.getDescription());
         m.put("rate", item.getRate());
         m.put("quantity", item.getQuantity());
+        m.put("amount", item.getAmount());
+        m.put("createdAt", item.getCreatedAt());
+        m.put("updatedAt", item.getUpdatedAt());
+        m.put("deletedAt", item.getDeletedAt());
+        m.put("isDeleted", item.getIsDeleted());
+        m.put("deviceId", item.getDeviceId());
+        return m;
+    }
+
+    private Quotation buildQuotation(
+            SyncChangeDto change,
+            User user,
+            Long userId,
+            String deviceId,
+            LocalDateTime serverTime,
+            String conflictPolicy
+    ) {
+        UUID id = requireEntityId(change, "Quotation id missing");
+        QuotationSyncPayload payload = toPayload(change, QuotationSyncPayload.class);
+
+        UUID clientId = requireUuid(payload.getClientId(), "Client id missing for quotation");
+
+        Client client = clientRepository.findByIdAndUserId(clientId, userId)
+                .orElseThrow(() -> new RuntimeException("Client not found for quotation"));
+
+        Optional<Quotation> existingQuotation = quotationRepository.findByIdAndUserId(id, userId);
+        Quotation quotation = existingQuotation.orElseGet(Quotation::new);
+
+        if (hasServerConflict(quotation.getUpdatedAt(), change.getCreatedAt(), conflictPolicy)) {
+            return null;
+        }
+
+        quotation.setId(id);
+        quotation.setUser(user);
+        quotation.setClient(client);
+
+        LocalDateTime effectiveQuotationDate = valueOrDefault(payload.getIssueDate(), serverTime);
+        if (existingQuotation.isEmpty()) {
+            String nextNumber = quotationService.generateNextQuotationNumber(userId, effectiveQuotationDate);
+            quotation.setQuotationNumber(nextNumber);
+        }
+
+        quotation.setStatus(QuotationStatus.valueOf(valueOrDefault(payload.getStatus(), "DRAFT").toUpperCase()));
+        quotation.setIssueDate(effectiveQuotationDate);
+        quotation.setValidUntilDate(payload.getValidUntilDate());
+        quotation.setNotes(payload.getNotes());
+        quotation.setTermsAndConditions(payload.getTermsAndConditions());
+        quotation.setPdfUrl(payload.getPdfUrl());
+        quotation.setPdfPath(payload.getPdfPath());
+
+        quotation.setSubtotal(valueOrDefault(payload.getSubtotal(), 0.0));
+        quotation.setDiscount(valueOrDefault(payload.getDiscount(), 0.0));
+        quotation.setGrossAmount(valueOrDefault(payload.getGrossAmount(), valueOrDefault(payload.getSubtotal(), 0.0)));
+        quotation.setTotalAmount(valueOrDefault(payload.getTotalAmount(), 0.0));
+        quotation.setNetPayable(valueOrDefault(payload.getNetPayable(), valueOrDefault(payload.getTotalAmount(), 0.0)));
+
+        quotation.setDeviceId(valueOrDefault(payload.getDeviceId(), deviceId));
+
+        if (quotation.getCreatedAt() == null) {
+            quotation.setCreatedAt(serverTime);
+        }
+
+        quotation.setUpdatedAt(serverTime);
+        quotation.setVersion(nextVersion(quotation.getVersion()));
+
+        if ("delete".equalsIgnoreCase(change.getOperation())) {
+            quotation.markDeleted(serverTime);
+
+            if (quotation.getItems() != null) {
+                quotation.getItems().forEach(item -> item.markDeleted(serverTime));
+                quotationItemRepository.saveAll(quotation.getItems());
+            }
+        } else {
+            quotation.setIsDeleted(Boolean.TRUE.equals(payload.getIsDeleted()));
+            quotation.setDeletedAt(payload.getDeletedAt());
+        }
+
+        return quotation;
+    }
+
+    private QuotationItem buildQuotationItem(
+            SyncChangeDto change,
+            User user,
+            Long userId,
+            String deviceId,
+            LocalDateTime serverTime
+    ) {
+        UUID id = requireEntityId(change, "Quotation item id missing");
+        QuotationItemSyncPayload payload = toPayload(change, QuotationItemSyncPayload.class);
+
+        UUID quotationId = requireUuid(payload.getQuotationId(), "Quotation item parent id missing");
+        requirePositive(payload.getAmount(), "Quotation item amount must be non-negative");
+        requirePositive(payload.getQuantity(), "Quotation item quantity must be positive");
+
+        Quotation quotation = quotationRepository.findByIdAndUserId(quotationId, userId)
+                .orElseThrow(() -> new RuntimeException("Quotation not found for quotation item"));
+
+        QuotationItem item = quotationItemRepository.findByIdAndUserId(id, userId)
+                .orElseGet(QuotationItem::new);
+
+        item.setId(id);
+        item.setUser(user);
+        item.setQuotation(quotation);
+        item.setDescription(payload.getDescription());
+        item.setDimension(payload.getDimension());
+        item.setQuantity(valueOrDefault(payload.getQuantity(), 1));
+        item.setKgs(payload.getKgs());
+        item.setAmount(valueOrDefault(payload.getAmount(), 0.0));
+        item.setDeviceId(valueOrDefault(payload.getDeviceId(), deviceId));
+
+        if (item.getCreatedAt() == null) {
+            item.setCreatedAt(serverTime);
+        }
+
+        item.setUpdatedAt(serverTime);
+
+        if ("delete".equalsIgnoreCase(change.getOperation())) {
+            item.markDeleted(serverTime);
+        } else {
+            item.setIsDeleted(Boolean.TRUE.equals(payload.getIsDeleted()));
+            item.setDeletedAt(payload.getDeletedAt());
+        }
+
+        return item;
+    }
+
+    private Map<String, Object> quotationToMap(Quotation q) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", q.getId());
+        m.put("clientId", q.getClient() != null ? q.getClient().getId() : null);
+        m.put("clientName", q.getClient() != null ? q.getClient().getName() : null);
+        m.put("quotationNumber", q.getQuotationNumber());
+        m.put("status", q.getStatus() != null ? q.getStatus().name() : null);
+        m.put("issueDate", q.getIssueDate());
+        m.put("validUntilDate", q.getValidUntilDate());
+        m.put("notes", q.getNotes());
+        m.put("termsAndConditions", q.getTermsAndConditions());
+        m.put("pdfUrl", q.getPdfUrl());
+        m.put("pdfPath", q.getPdfPath());
+        m.put("subtotal", q.getSubtotal());
+        m.put("discount", q.getDiscount());
+        m.put("grossAmount", q.getGrossAmount());
+        m.put("totalAmount", q.getTotalAmount());
+        m.put("netPayable", q.getNetPayable());
+        m.put("createdAt", q.getCreatedAt());
+        m.put("updatedAt", q.getUpdatedAt());
+        m.put("deletedAt", q.getDeletedAt());
+        m.put("isDeleted", q.getIsDeleted());
+        m.put("deviceId", q.getDeviceId());
+        m.put("version", q.getVersion());
+        return m;
+    }
+
+    private Map<String, Object> quotationItemToMap(QuotationItem item) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", item.getId());
+        m.put("quotationId", item.getQuotation() != null ? item.getQuotation().getId() : null);
+        m.put("description", item.getDescription());
+        m.put("dimension", item.getDimension());
+        m.put("quantity", item.getQuantity());
+        m.put("kgs", item.getKgs());
         m.put("amount", item.getAmount());
         m.put("createdAt", item.getCreatedAt());
         m.put("updatedAt", item.getUpdatedAt());

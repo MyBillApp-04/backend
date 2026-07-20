@@ -4,9 +4,11 @@ import com.mybill.MyBill_Backend.dto.GlobalSearchResponse;
 import com.mybill.MyBill_Backend.entity.Client;
 import com.mybill.MyBill_Backend.entity.ClientWork;
 import com.mybill.MyBill_Backend.entity.Invoice;
+import com.mybill.MyBill_Backend.entity.Quotation;
 import com.mybill.MyBill_Backend.repository.ClientRepository;
 import com.mybill.MyBill_Backend.repository.ClientWorkRepository;
 import com.mybill.MyBill_Backend.repository.InvoiceRepository;
+import com.mybill.MyBill_Backend.repository.QuotationRepository;
 import com.mybill.MyBill_Backend.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -24,6 +26,7 @@ public class SearchService {
     private final ClientRepository clientRepository;
     private final ClientWorkRepository workRepository;
     private final InvoiceRepository invoiceRepository;
+    private final QuotationRepository quotationRepository;
     private final SecurityUtils securityUtils;
 
     @Transactional(readOnly = true)
@@ -47,6 +50,9 @@ public class SearchService {
                         .toList())
                 .invoices(invoiceRepository.searchInvoices(userId, safeQuery, null, null, boundedPageable)
                         .map(this::invoiceToMap)
+                        .toList())
+                .quotations(quotationRepository.searchQuotations(userId, safeQuery, boundedPageable)
+                        .map(this::quotationToMap)
                         .toList())
                 .build();
     }
@@ -78,6 +84,16 @@ public class SearchService {
         m.put("remainingAmount", invoice.getRemainingAmount());
         m.put("paymentStatus", invoice.getPaymentStatus());
         m.put("clientName", invoice.getClient() != null ? invoice.getClient().getName() : null);
+        return m;
+    }
+
+    private Map<String, Object> quotationToMap(Quotation quotation) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", quotation.getId());
+        m.put("quotationNumber", quotation.getQuotationNumber());
+        m.put("totalAmount", quotation.getTotalAmount());
+        m.put("status", quotation.getStatus());
+        m.put("clientName", quotation.getClient() != null ? quotation.getClient().getName() : null);
         return m;
     }
 }
