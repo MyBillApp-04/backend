@@ -23,6 +23,9 @@ public class WorkSyncPayload {
     private LocalDateTime workDate;
     private LocalDateTime date;
 
+    private String previousInvoiceNumber;
+    private LocalDateTime lastBilledDate;
+
     private Boolean billed;
     private Boolean isDeleted;
     private LocalDateTime deletedAt;

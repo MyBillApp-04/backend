@@ -65,6 +65,12 @@ public class ClientWork {
     @Column(nullable = false)
     private Boolean isDeleted = false;
 
+    @Column(name = "previous_invoice_number")
+    private String previousInvoiceNumber;
+
+    @Column(name = "last_billed_date")
+    private LocalDateTime lastBilledDate;
+
     private String deviceId;
 
     @Builder.Default

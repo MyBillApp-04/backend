@@ -105,20 +105,20 @@ public class InvoiceService {
             }
         }
 
-        double subtotal = works.stream()
+        double subtotal = roundMoney(works.stream()
                 .mapToDouble(work -> work.getAmount() != null ? work.getAmount() : 0.0)
-                .sum();
+                .sum());
 
-        double finalDiscount = discount != null ? discount : 0.0;
-        double grossAmount = subtotal - finalDiscount;
+        double finalDiscount = roundMoney(discount != null ? discount : 0.0);
+        double grossAmount = roundMoney(subtotal - finalDiscount);
 
         if (grossAmount < 0) {
             throw new RuntimeException("Discount cannot be greater than subtotal");
         }
 
-        double availableAdvance = clientFinancialService.getAdvanceBalance(clientId, userId);
-        double advanceApplied = Math.min(availableAdvance, grossAmount);
-        double netPayable = Math.max(grossAmount - advanceApplied, 0.0);
+        double availableAdvance = roundMoney(clientFinancialService.getAdvanceBalance(clientId, userId));
+        double advanceApplied = roundMoney(Math.min(availableAdvance, grossAmount));
+        double netPayable = roundMoney(Math.max(grossAmount - advanceApplied, 0.0));
 
         LocalDateTime now = LocalDateTime.now();
         InvoiceNumberService.InvoiceNumberResult invoiceNumber =
@@ -554,5 +554,9 @@ public class InvoiceService {
         invoice.markDeleted(now);
 
         invoiceRepository.save(invoice);
+    }
+
+    private double roundMoney(double value) {
+        return Math.round(value * 100.0) / 100.0;
     }
 }

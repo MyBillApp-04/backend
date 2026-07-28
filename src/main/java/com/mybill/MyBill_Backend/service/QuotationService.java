@@ -69,11 +69,11 @@ public class QuotationService {
                 .termsAndConditions(dto.getTermsAndConditions())
                 .pdfUrl(dto.getPdfUrl())
                 .pdfPath(dto.getPdfPath())
-                .subtotal(dto.getSubtotal() != null ? dto.getSubtotal() : 0.0)
-                .discount(dto.getDiscount() != null ? dto.getDiscount() : 0.0)
-                .grossAmount(dto.getGrossAmount() != null ? dto.getGrossAmount() : 0.0)
-                .totalAmount(dto.getTotalAmount() != null ? dto.getTotalAmount() : 0.0)
-                .netPayable(dto.getNetPayable() != null ? dto.getNetPayable() : 0.0)
+                .subtotal(roundMoney(dto.getSubtotal() != null ? dto.getSubtotal() : 0.0))
+                .discount(roundMoney(dto.getDiscount() != null ? dto.getDiscount() : 0.0))
+                .grossAmount(roundMoney(dto.getGrossAmount() != null ? dto.getGrossAmount() : 0.0))
+                .totalAmount(roundMoney(dto.getTotalAmount() != null ? dto.getTotalAmount() : 0.0))
+                .netPayable(roundMoney(dto.getNetPayable() != null ? dto.getNetPayable() : 0.0))
                 .isDeleted(false)
                 .version(1)
                 .build();
@@ -203,5 +203,9 @@ public class QuotationService {
                 .getSingleResult();
         int sequence = ((Number) value).intValue();
         return "QT-" + financialYearCode + "-" + String.format("%04d", sequence);
+    }
+
+    private double roundMoney(double value) {
+        return Math.round(value * 100.0) / 100.0;
     }
 }

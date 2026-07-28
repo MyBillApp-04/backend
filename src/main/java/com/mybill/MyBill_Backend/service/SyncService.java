@@ -536,6 +536,8 @@ public class SyncService {
         work.setAmount(valueOrDefault(payload.getAmount(), work.getRate() * work.getQuantity()));
         work.setDate(valueOrDefault(payload.getWorkDate(), serverTime));
         work.setBilled(Boolean.TRUE.equals(payload.getBilled()));
+        work.setPreviousInvoiceNumber(payload.getPreviousInvoiceNumber());
+        work.setLastBilledDate(payload.getLastBilledDate());
         work.setDeviceId(valueOrDefault(payload.getDeviceId(), deviceId));
 
         if (payload.getInvoiceId() != null) {
@@ -925,6 +927,8 @@ public class SyncService {
         m.put("workDate", w.getDate());
         m.put("billed", w.getBilled());
         m.put("invoiceId", w.getInvoice() != null ? w.getInvoice().getId() : null);
+        m.put("previousInvoiceNumber", w.getPreviousInvoiceNumber());
+        m.put("lastBilledDate", w.getLastBilledDate());
         m.put("createdAt", w.getCreatedAt());
         m.put("updatedAt", w.getUpdatedAt());
         m.put("deletedAt", w.getDeletedAt());
