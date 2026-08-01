@@ -40,6 +40,9 @@ public class SecurityConfig {
     @Value("${app.allowed-origins:}")
     private String allowedOrigins;
 
+    @Value("${app.public-url.base-url:}")
+    private String publicBaseUrl;
+
     @Value("${app.security.require-https:false}")
     private boolean requireHttps;
 
@@ -140,21 +143,23 @@ public class SecurityConfig {
         if ("*".equals(allowedOrigins) || isDevProfile()) {
             config.setAllowedOriginPatterns(List.of("*"));
             config.setAllowCredentials(true);
-        } else if (!allowedOrigins.isBlank()) {
-            List<String> origins = new ArrayList<>(Arrays.stream(allowedOrigins.split(","))
-                    .map(String::trim)
-                    .map(this::normalizeOriginPattern)
-                    .filter(origin -> !origin.isBlank())
-                    .toList());
+        } else {
+            List<String> origins = new ArrayList<>();
+            if (!allowedOrigins.isBlank()) {
+                origins.addAll(Arrays.stream(allowedOrigins.split(","))
+                        .map(String::trim)
+                        .map(this::normalizeOriginPattern)
+                        .filter(origin -> !origin.isBlank())
+                        .toList());
+            }
             addFirebaseHostingOrigins(origins);
+            addPublicBaseUrlOrigin(origins);
+
             if (origins.stream().anyMatch(origin -> origin.contains("*"))) {
                 config.setAllowedOriginPatterns(origins);
             } else {
                 config.setAllowedOrigins(origins);
             }
-            config.setAllowCredentials(true);
-        } else {
-            config.setAllowedOrigins(FIREBASE_HOSTING_ORIGINS);
             config.setAllowCredentials(true);
         }
 
@@ -188,6 +193,31 @@ public class SecurityConfig {
 
     private void addFirebaseHostingOrigins(List<String> origins) {
         FIREBASE_HOSTING_ORIGINS.forEach(origin -> addIfMissing(origins, origin));
+    }
+
+    private void addPublicBaseUrlOrigin(List<String> origins) {
+        String origin = extractOrigin(publicBaseUrl);
+        if (origin != null && !origin.isBlank()) {
+            addIfMissing(origins, origin);
+        }
+    }
+
+    private String extractOrigin(String url) {
+        if (url == null || url.isBlank()) {
+            return null;
+        }
+        try {
+            java.net.URI uri = new java.net.URI(url.trim());
+            if (uri.getScheme() != null && uri.getHost() != null) {
+                int port = uri.getPort();
+                if (port != -1 && port != 80 && port != 443) {
+                    return uri.getScheme() + "://" + uri.getHost() + ":" + port;
+                }
+                return uri.getScheme() + "://" + uri.getHost();
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     private void addIfMissing(List<String> origins, String origin) {

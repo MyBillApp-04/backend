@@ -136,7 +136,7 @@ class QuotationPublicResponseServiceTest {
 
         assertThat(result.success()).isTrue();
         assertThat(result.status()).isEqualTo("DISCUSSION_REQUESTED");
-        assertThat(sampleQuotation.getStatus()).isEqualTo(QuotationStatus.SENT); // Main status remains active
+        assertThat(sampleQuotation.getStatus()).isEqualTo(QuotationStatus.DISCUSSION_REQUESTED);
         assertThat(sampleQuotation.getDiscussionMessage()).isEqualTo("Can we get 5% discount?");
     }
 

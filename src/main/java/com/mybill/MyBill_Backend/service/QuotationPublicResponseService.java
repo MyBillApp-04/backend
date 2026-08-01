@@ -29,7 +29,7 @@ public class QuotationPublicResponseService {
     private final QuotationResponseEventRepository responseEventRepository;
     private final FcmNotificationService fcmNotificationService;
 
-    @Value("${app.public-url.base-url:https://mybill-backend-vckc.onrender.com}")
+    @Value("${app.public-url.base-url:https://mybill-backend-vdkc.onrender.com}")
     private String baseUrl;
 
     public QuotationPublicResponseService(
@@ -246,7 +246,7 @@ public class QuotationPublicResponseService {
 
     private String normalizeBaseUrl(String url) {
         if (url == null || url.isBlank()) {
-            return "https://mybill-backend-vckc.onrender.com";
+            return "https://mybill-backend-vdkc.onrender.com";
         }
         String trimmed = url.trim();
         return trimmed.endsWith("/") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
