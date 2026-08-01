@@ -95,14 +95,14 @@ class SecurityConfigCorsTest {
         SecurityConfig config = new SecurityConfig(null, null,
                 new MockEnvironment().withProperty("spring.profiles.active", "prod"));
         ReflectionTestUtils.setField(config, "allowedOrigins", "https://mybill-app-04.firebaseapp.com");
-        ReflectionTestUtils.setField(config, "publicBaseUrl", "https://mybill-backend-vdkc.onrender.com");
+        ReflectionTestUtils.setField(config, "publicBaseUrl", "https://mybill-backend-vckc.onrender.com");
 
         CorsConfiguration cors = config.corsConfigurationSource()
-                .getCorsConfiguration(preflightRequest("https://mybill-backend-vdkc.onrender.com"));
+                .getCorsConfiguration(preflightRequest("https://mybill-backend-vckc.onrender.com"));
 
         assertThat(cors).isNotNull();
-        assertThat(cors.checkOrigin("https://mybill-backend-vdkc.onrender.com"))
-                .isEqualTo("https://mybill-backend-vdkc.onrender.com");
+        assertThat(cors.checkOrigin("https://mybill-backend-vckc.onrender.com"))
+                .isEqualTo("https://mybill-backend-vckc.onrender.com");
     }
 
     @Test
