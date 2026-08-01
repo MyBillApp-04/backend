@@ -51,9 +51,14 @@ public class RequestCorrelationFilter extends OncePerRequestFilter {
         } finally {
             long durationMs = (System.nanoTime() - startedAt) / 1_000_000;
             try (MDC.MDCCloseable ignored = MDC.putCloseable(REQUEST_ID_MDC_KEY, requestId)) {
-                log.info("http_request method={} path={} status={} duration_ms={}",
-                        request.getMethod(), request.getRequestURI(),
-                        response.getStatus(), durationMs);
+                if ("OPTIONS".equalsIgnoreCase(request.getMethod()) && response.getStatus() >= 400) {
+                    log.info("http_request method={} path={} status={} duration_ms={} origin={}",
+                            request.getMethod(), request.getRequestURI(), response.getStatus(), durationMs,
+                            SecureLogMessageConverter.sanitize(request.getHeader("Origin")));
+                } else {
+                    log.info("http_request method={} path={} status={} duration_ms={}",
+                            request.getMethod(), request.getRequestURI(), response.getStatus(), durationMs);
+                }
             }
         }
     }

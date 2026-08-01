@@ -76,6 +76,21 @@ class SecurityConfigCorsTest {
     }
 
     @Test
+    void productionConfigurationSupportsLocalFlutterWebPortsWhenExplicitlyConfigured() {
+        SecurityConfig config = new SecurityConfig(null, null,
+                new MockEnvironment().withProperty("spring.profiles.active", "prod"));
+        ReflectionTestUtils.setField(config, "allowedOrigins", "http://localhost:*,http://127.0.0.1:*");
+
+        CorsConfiguration cors = config.corsConfigurationSource()
+                .getCorsConfiguration(preflightRequest("http://localhost:53642"));
+
+        assertThat(cors.checkOrigin("http://localhost:53642"))
+                .isEqualTo("http://localhost:53642");
+        assertThat(cors.checkOrigin("http://127.0.0.1:61234"))
+                .isEqualTo("http://127.0.0.1:61234");
+    }
+
+    @Test
     void rateLimitFilterIsRegisteredAtHighestPrecedence() {
         RateLimitFilter filter = new RateLimitFilter(mock(SecurityUtils.class));
         SecurityConfig config = new SecurityConfig(null, filter, new MockEnvironment());

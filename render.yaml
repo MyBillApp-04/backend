@@ -9,7 +9,8 @@ services:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
       - key: ALLOWED_ORIGINS
-        value: "https://mybill-app-04.firebaseapp.com,https://mybill-app-04.web.app"
+        # Firebase Hosting plus local Flutter web debugging against Render.
+        value: "https://mybill-app-04.firebaseapp.com,https://mybill-app-04.web.app,http://localhost:*,http://127.0.0.1:*,http://[::1]:*"
       - key: PUBLIC_BASE_URL
         value: "https://mybill-backend-vckc.onrender.com"
       - key: JAVA_TOOL_OPTIONS
