@@ -28,6 +28,11 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    private static final List<String> FIREBASE_HOSTING_ORIGINS = List.of(
+            "https://mybill-app-04.firebaseapp.com",
+            "https://mybill-app-04.web.app"
+    );
+
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final RateLimitFilter rateLimitFilter;
     private final Environment environment;
@@ -141,6 +146,7 @@ public class SecurityConfig {
                     .map(this::normalizeOriginPattern)
                     .filter(origin -> !origin.isBlank())
                     .toList());
+            addFirebaseHostingOrigins(origins);
             if (origins.stream().anyMatch(origin -> origin.contains("*"))) {
                 config.setAllowedOriginPatterns(origins);
             } else {
@@ -148,7 +154,7 @@ public class SecurityConfig {
             }
             config.setAllowCredentials(true);
         } else {
-            config.setAllowedOriginPatterns(List.of("*"));
+            config.setAllowedOrigins(FIREBASE_HOSTING_ORIGINS);
             config.setAllowCredentials(true);
         }
 
@@ -178,6 +184,10 @@ public class SecurityConfig {
         addIfMissing(origins, "http://localhost:[*]");
         addIfMissing(origins, "http://127.0.0.1:[*]");
         addIfMissing(origins, "http://[::1]:[*]");
+    }
+
+    private void addFirebaseHostingOrigins(List<String> origins) {
+        FIREBASE_HOSTING_ORIGINS.forEach(origin -> addIfMissing(origins, origin));
     }
 
     private void addIfMissing(List<String> origins, String origin) {

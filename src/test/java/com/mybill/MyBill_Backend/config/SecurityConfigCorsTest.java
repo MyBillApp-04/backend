@@ -59,6 +59,23 @@ class SecurityConfigCorsTest {
     }
 
     @Test
+    void productionConfigurationRetainsFirebaseHostingOriginsWhenAdditionalOriginsAreConfigured() {
+        SecurityConfig config = new SecurityConfig(null, null,
+                new MockEnvironment().withProperty("spring.profiles.active", "prod"));
+        ReflectionTestUtils.setField(config, "allowedOrigins", "https://admin.example.com");
+
+        CorsConfiguration cors = config.corsConfigurationSource()
+                .getCorsConfiguration(preflightRequest("https://admin.example.com"));
+
+        assertThat(cors.checkOrigin("https://admin.example.com"))
+                .isEqualTo("https://admin.example.com");
+        assertThat(cors.checkOrigin("https://mybill-app-04.web.app"))
+                .isEqualTo("https://mybill-app-04.web.app");
+        assertThat(cors.checkOrigin("https://mybill-app-04.firebaseapp.com"))
+                .isEqualTo("https://mybill-app-04.firebaseapp.com");
+    }
+
+    @Test
     void rateLimitFilterIsRegisteredAtHighestPrecedence() {
         RateLimitFilter filter = new RateLimitFilter(mock(SecurityUtils.class));
         SecurityConfig config = new SecurityConfig(null, filter, new MockEnvironment());
