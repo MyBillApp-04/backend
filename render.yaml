@@ -8,5 +8,7 @@ services:
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
+      - key: PUBLIC_BASE_URL
+        value: "https://mybill-backend-vckc.onrender.com"
       - key: JAVA_TOOL_OPTIONS
         value: "-Xms64m -Xmx256m -XX:+UseContainerSupport -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=48m -XX:MaxDirectMemorySize=32m -Xss512k -XX:ActiveProcessorCount=1 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xlog:gc*,safepoint:file=/tmp/mybill-gc.log:time,uptime,level,tags:filecount=3,filesize=5M -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/urandom"
