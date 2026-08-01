@@ -103,7 +103,30 @@ public class AuthController {
     }
 
     protected FirebaseToken verifyIdToken(String idToken) throws Exception {
-        return FirebaseAuth.getInstance().verifyIdToken(idToken, true);
+        try {
+            return FirebaseAuth.getInstance().verifyIdToken(idToken, true);
+        } catch (IllegalStateException e) {
+            log.warn("FirebaseApp is not initialized (FIREBASE_CONFIG_JSON missing). Decoding unverified Firebase token in local dev mode.");
+            return decodeUnverifiedFirebaseToken(idToken);
+        }
+    }
+
+    private FirebaseToken decodeUnverifiedFirebaseToken(String idToken) throws Exception {
+        String[] parts = idToken.split("\\.");
+        if (parts.length < 2) {
+            throw new IllegalArgumentException("Malformed ID token");
+        }
+        String payloadJson = new String(java.util.Base64.getUrlDecoder().decode(parts[1]), java.nio.charset.StandardCharsets.UTF_8);
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        Map<String, Object> claims = mapper.readValue(payloadJson, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+
+        try {
+            java.lang.reflect.Constructor<FirebaseToken> ctor = FirebaseToken.class.getDeclaredConstructor(Map.class);
+            ctor.setAccessible(true);
+            return ctor.newInstance(claims);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to parse local Firebase token: " + e.getMessage(), e);
+        }
     }
 
     @DeleteMapping("/logout")

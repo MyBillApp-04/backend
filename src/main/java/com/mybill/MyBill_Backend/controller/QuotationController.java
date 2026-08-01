@@ -5,6 +5,7 @@ import com.mybill.MyBill_Backend.dto.QuotationItemDTO;
 import com.mybill.MyBill_Backend.entity.Quotation;
 import com.mybill.MyBill_Backend.entity.QuotationItem;
 import com.mybill.MyBill_Backend.service.QuotationService;
+import com.mybill.MyBill_Backend.service.QuotationPublicResponseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -23,6 +24,8 @@ import java.util.stream.Collectors;
 public class QuotationController {
 
     private final QuotationService quotationService;
+    private final QuotationPublicResponseService publicResponseService;
+    private final com.mybill.MyBill_Backend.util.SecurityUtils securityUtils;
 
     @GetMapping
     public ResponseEntity<Page<QuotationDTO>> getQuotations(Pageable pageable) {
@@ -57,6 +60,21 @@ public class QuotationController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/public-link")
+    public ResponseEntity<?> generatePublicLink(@PathVariable UUID id) {
+        Long userId = securityUtils.getCurrentUserId();
+        QuotationPublicResponseService.PublicLinkResult result =
+                publicResponseService.generateOrRegeneratePublicLink(id, userId);
+        return ResponseEntity.ok(result);
+    }
+
+    @DeleteMapping("/{id}/public-link")
+    public ResponseEntity<Void> revokePublicLink(@PathVariable UUID id) {
+        Long userId = securityUtils.getCurrentUserId();
+        publicResponseService.revokePublicLink(id, userId);
+        return ResponseEntity.noContent().build();
+    }
+
     private QuotationDTO toDTO(Quotation q) {
         List<QuotationItemDTO> items = q.getItems() == null ? List.of() : q.getItems().stream()
                 .filter(item -> !Boolean.TRUE.equals(item.getIsDeleted()))
@@ -88,6 +106,11 @@ public class QuotationController {
                 .grossAmount(q.getGrossAmount())
                 .totalAmount(q.getTotalAmount())
                 .netPayable(q.getNetPayable())
+                .tokenExpiresAt(q.getTokenExpiresAt())
+                .tokenRevokedAt(q.getTokenRevokedAt())
+                .clientResponseStatus(q.getClientResponseStatus())
+                .respondedAt(q.getRespondedAt())
+                .discussionMessage(q.getDiscussionMessage())
                 .version(q.getVersion())
                 .items(items)
                 .build();

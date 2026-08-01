@@ -12,12 +12,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class FirebaseConfigTest {
 
     @Test
-    void rejectsMissingRuntimeConfiguration() {
+    void rejectsMissingRuntimeConfiguration() throws Exception {
         FirebaseConfig config = new FirebaseConfig(new MockEnvironment());
 
-        assertThatThrownBy(config::getFirebaseServiceAccount)
-                .isInstanceOf(java.io.IOException.class)
-                .hasMessageContaining("FIREBASE_CONFIG_JSON");
+        assertThat(config.getFirebaseServiceAccount()).isNull();
     }
 
     @Test

@@ -17,6 +17,8 @@ public interface QuotationRepository extends JpaRepository<Quotation, UUID> {
 
     Optional<Quotation> findByIdAndUserId(UUID id, Long userId);
 
+    Optional<Quotation> findByPublicTokenHash(String publicTokenHash);
+
     Optional<Quotation> findByQuotationNumberAndUserId(String quotationNumber, Long userId);
 
     Page<Quotation> findByUserIdAndIsDeletedFalse(Long userId, Pageable pageable);

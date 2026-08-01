@@ -1144,6 +1144,11 @@ public class SyncService {
         m.put("grossAmount", q.getGrossAmount());
         m.put("totalAmount", q.getTotalAmount());
         m.put("netPayable", q.getNetPayable());
+        m.put("tokenExpiresAt", q.getTokenExpiresAt());
+        m.put("tokenRevokedAt", q.getTokenRevokedAt());
+        m.put("clientResponseStatus", q.getClientResponseStatus());
+        m.put("respondedAt", q.getRespondedAt());
+        m.put("discussionMessage", q.getDiscussionMessage());
         m.put("createdAt", q.getCreatedAt());
         m.put("updatedAt", q.getUpdatedAt());
         m.put("deletedAt", q.getDeletedAt());

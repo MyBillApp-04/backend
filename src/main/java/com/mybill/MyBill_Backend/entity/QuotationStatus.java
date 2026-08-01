@@ -5,5 +5,6 @@ public enum QuotationStatus {
     SENT,
     ACCEPTED,
     REJECTED,
-    EXPIRED
+    EXPIRED,
+    DISCUSSION_REQUESTED
 }

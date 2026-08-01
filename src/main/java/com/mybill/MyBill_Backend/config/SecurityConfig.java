@@ -90,7 +90,7 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/auth/**", "/auth/**", "/error").permitAll()
+                        .requestMatchers("/api/auth/**", "/auth/**", "/error", "/q/**").permitAll()
                         .requestMatchers("/ping", "/api/auth/ping").permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         // Public: update checks work before/after login; Image.network shows logo without Auth.
@@ -107,6 +107,11 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public org.springframework.web.filter.CorsFilter corsFilter() {
+        return new org.springframework.web.filter.CorsFilter(corsConfigurationSource());
     }
 
     @Bean
@@ -127,28 +132,23 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        if ("*".equals(allowedOrigins)) {
+        if ("*".equals(allowedOrigins) || isDevProfile()) {
             config.setAllowedOriginPatterns(List.of("*"));
-            config.setAllowCredentials(false);
+            config.setAllowCredentials(true);
         } else if (!allowedOrigins.isBlank()) {
             List<String> origins = new ArrayList<>(Arrays.stream(allowedOrigins.split(","))
                     .map(String::trim)
                     .map(this::normalizeOriginPattern)
                     .filter(origin -> !origin.isBlank())
                     .toList());
-            if (isDevProfile()) {
-                addLocalDevPatterns(origins);
-            }
             if (origins.stream().anyMatch(origin -> origin.contains("*"))) {
                 config.setAllowedOriginPatterns(origins);
             } else {
                 config.setAllowedOrigins(origins);
             }
             config.setAllowCredentials(true);
-        } else if (isDevProfile()) {
-            List<String> origins = new ArrayList<>();
-            addLocalDevPatterns(origins);
-            config.setAllowedOriginPatterns(origins);
+        } else {
+            config.setAllowedOriginPatterns(List.of("*"));
             config.setAllowCredentials(true);
         }
 

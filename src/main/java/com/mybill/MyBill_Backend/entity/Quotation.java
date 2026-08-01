@@ -100,6 +100,27 @@ public class Quotation {
     @Column(name = "device_id")
     private String deviceId;
 
+    @Column(name = "public_token_hash", length = 64)
+    private String publicTokenHash;
+
+    @Column(name = "token_created_at")
+    private LocalDateTime tokenCreatedAt;
+
+    @Column(name = "token_expires_at")
+    private LocalDateTime tokenExpiresAt;
+
+    @Column(name = "token_revoked_at")
+    private LocalDateTime tokenRevokedAt;
+
+    @Column(name = "client_response_status", length = 30)
+    private String clientResponseStatus;
+
+    @Column(name = "responded_at")
+    private LocalDateTime respondedAt;
+
+    @Column(name = "discussion_message", columnDefinition = "text")
+    private String discussionMessage;
+
     @Builder.Default
     @Column(nullable = false)
     private Integer version = 1;

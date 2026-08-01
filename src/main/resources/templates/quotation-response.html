@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quotation Response - MyBill</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #F8FAFC;
+            color: #0F172A;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            width: 100%;
+            max-width: 520px;
+            background: #FFFFFF;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+            border: 1px solid #E2E8F0;
+            overflow: hidden;
+        }
+        .header {
+            background: #1A237E;
+            color: #FFFFFF;
+            padding: 28px 24px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 6px;
+        }
+        .header p {
+            font-size: 13px;
+            color: #C5CAE9;
+        }
+        .content {
+            padding: 28px 24px;
+        }
+        .card {
+            background: #F1F5F9;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            font-size: 14px;
+            border-bottom: 1px dashed #CBD5E1;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            color: #64748B;
+            font-weight: 500;
+        }
+        .info-value {
+            font-weight: 600;
+            color: #0F172A;
+        }
+        .amount-highlight {
+            font-size: 18px;
+            color: #1A237E;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .badge-pending { background: #FEF3C7; color: #92400E; }
+        .badge-accepted { background: #DCFCE7; color: #166534; }
+        .badge-declined { background: #FEE2E2; color: #991B1B; }
+        .badge-discussion { background: #E0F2FE; color: #075985; }
+
+        .error-box {
+            background: #FEF2F2;
+            border: 1px solid #FCA5A5;
+            color: #991B1B;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .success-box {
+            background: #F0FDF4;
+            border: 1px solid #86EFAC;
+            color: #166534;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .actions-form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 14px 20px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            text-align: center;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            text-decoration: none;
+        }
+        .btn:active {
+            transform: scale(0.98);
+        }
+        .btn-accept {
+            background-color: #16A34A;
+            color: #FFFFFF;
+        }
+        .btn-accept:hover {
+            background-color: #15803D;
+        }
+        .btn-decline {
+            background-color: #DC2626;
+            color: #FFFFFF;
+        }
+        .btn-decline:hover {
+            background-color: #B91C1C;
+        }
+        .btn-discuss {
+            background-color: #2563EB;
+            color: #FFFFFF;
+        }
+        .btn-discuss:hover {
+            background-color: #1D4ED8;
+        }
+        .textarea-field {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 8px;
+            border: 1px solid #CBD5E1;
+            font-family: inherit;
+            font-size: 14px;
+            resize: vertical;
+            min-height: 80px;
+            margin-bottom: 12px;
+        }
+        .textarea-field:focus {
+            outline: none;
+            border-color: #2563EB;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        }
+        .footer {
+            padding: 16px 24px;
+            background: #F8FAFC;
+            border-top: 1px solid #E2E8F0;
+            text-align: center;
+            font-size: 12px;
+            color: #94A3B8;
+        }
+        .discuss-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #E2E8F0;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1 th:text="${view != null && view.businessName != null ? view.businessName : 'MyBill Smart Invoicing'}">MyBill Vendor</h1>
+        <p>Quotation Response Portal</p>
+    </div>
+
+    <div class="content">
+        <!-- ERROR / EXPIRED / REVOKED BANNER -->
+        <div th:if="${errorMsg != null}" class="error-box">
+            <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 6px;">Notice</h3>
+            <p th:text="${errorMsg}">The requested quotation link is unavailable.</p>
+        </div>
+
+        <!-- SUCCESS BANNER -->
+        <div th:if="${successMsg != null}" class="success-box">
+            <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 6px;">Response Recorded</h3>
+            <p th:text="${successMsg}">Thank you! Your response has been submitted successfully.</p>
+        </div>
+
+        <!-- QUOTATION DETAILS CARD -->
+        <div th:if="${view != null && view.isValid}" class="card">
+            <div class="info-row">
+                <span class="info-label">Quotation Number:</span>
+                <span class="info-value" th:text="${view.quotationNumber}">QT-1001</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Prepared For:</span>
+                <span class="info-value" th:text="${view.clientName}">Valued Customer</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Total Proposed:</span>
+                <span class="info-value amount-highlight" th:text="${'₹ ' + #numbers.formatDecimal(view.totalAmount, 1, 'COMMA', 2, 'POINT')}">₹ 0.00</span>
+            </div>
+            <div th:if="${view.validUntilDate != null}" class="info-row">
+                <span class="info-label">Valid Until:</span>
+                <span class="info-value" th:text="${#temporals.format(view.validUntilDate, 'dd-MM-yyyy')}">01-01-2026</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Current Status:</span>
+                <span class="info-value">
+                    <span class="badge badge-pending" th:if="${view.clientResponseStatus == 'PENDING'}">Pending</span>
+                    <span class="badge badge-accepted" th:if="${view.clientResponseStatus == 'ACCEPTED'}">Accepted</span>
+                    <span class="badge badge-declined" th:if="${view.clientResponseStatus == 'DECLINED'}">Declined</span>
+                    <span class="badge badge-discussion" th:if="${view.clientResponseStatus == 'DISCUSSION_REQUESTED'}">Discussion Requested</span>
+                </span>
+            </div>
+            <div th:if="${view.discussionMessage != null && !view.discussionMessage.isBlank()}" class="info-row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                <span class="info-label">Your Message:</span>
+                <span class="info-value" style="font-weight: 400; color: #475569;" th:text="${view.discussionMessage}">Discussion note</span>
+            </div>
+        </div>
+
+        <!-- ACTION FORMS -->
+        <div th:if="${view != null && view.isValid && (view.clientResponseStatus == 'PENDING' || view.clientResponseStatus == 'DISCUSSION_REQUESTED') && successMsg == null}">
+            
+            <form th:action="@{'/q/' + ${view.token} + '/respond'}" method="post" class="actions-form">
+                <input type="hidden" name="action" value="ACCEPT" />
+                <button type="submit" class="btn btn-accept">✓ Accept Quotation</button>
+            </form>
+
+            <form th:action="@{'/q/' + ${view.token} + '/respond'}" method="post" class="actions-form" style="margin-top: 10px;">
+                <input type="hidden" name="action" value="DECLINE" />
+                <button type="submit" class="btn btn-decline" onclick="return confirm('Are you sure you want to decline this quotation?');">✕ Decline Quotation</button>
+            </form>
+
+            <div class="discuss-section">
+                <form th:action="@{'/q/' + ${view.token} + '/respond'}" method="post">
+                    <input type="hidden" name="action" value="DISCUSS" />
+                    <label for="message" style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px;">Want to discuss details or suggest changes?</label>
+                    <textarea id="message" name="message" class="textarea-field" placeholder="Enter your comments or discussion message..."></textarea>
+                    <button type="submit" class="btn btn-discuss">💬 Send Discussion Request</button>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="footer">
+        Powered by <strong>MyBill Smart Invoicing</strong>
+    </div>
+</div>
+
+</body>
+</html>

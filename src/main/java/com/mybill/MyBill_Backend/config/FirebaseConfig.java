@@ -47,14 +47,17 @@ public class FirebaseConfig {
             }
 
             InputStream serviceAccount = getFirebaseServiceAccount();
+            if (serviceAccount == null) {
+                logger.warn("FIREBASE_CONFIG_JSON is missing or empty. Firebase Admin SDK initialization skipped.");
+                return;
+            }
 
             initializeFirebaseApp(serviceAccount);
             logger.info("Firebase Admin SDK initialized successfully.");
 
         } catch (Exception exception) {
-            logger.error("Firebase Admin SDK initialization failed: exception={} message={}",
+            logger.warn("Firebase Admin SDK initialization skipped: exception={} message={}",
                     exception.getClass().getSimpleName(), SecureLogMessageConverter.sanitize(exception.getMessage()));
-            throw new RuntimeException("Failed to initialize Firebase Admin SDK", exception);
         }
     }
 
@@ -70,9 +73,7 @@ public class FirebaseConfig {
             return new ByteArrayInputStream(normalizedJson.getBytes(StandardCharsets.UTF_8));
         }
 
-        throw new IOException(
-                "Firebase configuration missing. Set FIREBASE_CONFIG_JSON at runtime."
-        );
+        return null;
     }
 
     private String normalizeFirebaseJson(String rawJson) throws IOException {

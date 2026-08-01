@@ -78,6 +78,14 @@ public class QuotationService {
                 .version(1)
                 .build();
 
+        String rawToken = (dto.getPublicToken() != null && !dto.getPublicToken().isBlank())
+                ? dto.getPublicToken().trim()
+                : quotation.getId().toString().replaceAll("-", "");
+        String tokenHash = hashToken(rawToken);
+        quotation.setPublicTokenHash(tokenHash);
+        quotation.setTokenCreatedAt(LocalDateTime.now());
+        quotation.setTokenExpiresAt(dto.getValidUntilDate() != null ? dto.getValidUntilDate() : LocalDateTime.now().plusDays(30));
+
         Quotation saved = quotationRepository.save(quotation);
 
         if (dto.getItems() != null) {
@@ -207,5 +215,22 @@ public class QuotationService {
 
     private double roundMoney(double value) {
         return Math.round(value * 100.0) / 100.0;
+    }
+
+    private String hashToken(String rawToken) {
+        if (rawToken == null || rawToken.isBlank()) return null;
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(rawToken.trim().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            return null;
+        }
     }
 }

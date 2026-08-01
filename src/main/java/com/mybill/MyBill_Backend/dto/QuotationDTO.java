@@ -32,5 +32,12 @@ public class QuotationDTO {
     private Double totalAmount;
     private Double netPayable;
     private Integer version;
+    private String publicToken;
+    private String publicResponseUrl;
+    private LocalDateTime tokenExpiresAt;
+    private LocalDateTime tokenRevokedAt;
+    private String clientResponseStatus;
+    private LocalDateTime respondedAt;
+    private String discussionMessage;
     private List<QuotationItemDTO> items;
 }
