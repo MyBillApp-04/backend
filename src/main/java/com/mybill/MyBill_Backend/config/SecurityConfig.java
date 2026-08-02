@@ -34,7 +34,8 @@ public class SecurityConfig {
     );
 
     private static final List<String> RENDER_ORIGIN_PATTERNS = List.of(
-            "https://*.onrender.com"
+            "https://*.onrender.com",
+            "http://*.onrender.com"
     );
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -173,7 +174,14 @@ public class SecurityConfig {
         config.setExposedHeaders(List.of(RequestCorrelationFilter.REQUEST_ID_HEADER));
         config.setMaxAge(3600L);
 
+        CorsConfiguration publicConfig = new CorsConfiguration();
+        publicConfig.setAllowedOriginPatterns(List.of("*"));
+        publicConfig.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
+        publicConfig.setAllowedHeaders(List.of("*"));
+        publicConfig.setMaxAge(3600L);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/q/**", publicConfig);
         source.registerCorsConfiguration("/**", config);
         return source;
     }

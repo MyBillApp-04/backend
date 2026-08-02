@@ -117,6 +117,25 @@ class SecurityConfigCorsTest {
         assertThat(cors).isNotNull();
         assertThat(cors.checkOrigin("https://my-custom-app.onrender.com"))
                 .isEqualTo("https://my-custom-app.onrender.com");
+        assertThat(cors.checkOrigin("http://my-custom-app.onrender.com"))
+                .isEqualTo("http://my-custom-app.onrender.com");
+    }
+
+    @Test
+    void publicQuotationRouteAllowsAnyOriginIncludingMobileWebviewsAndNull() {
+        SecurityConfig config = new SecurityConfig(null, null,
+                new MockEnvironment().withProperty("spring.profiles.active", "prod"));
+        ReflectionTestUtils.setField(config, "allowedOrigins", "https://mybill-app-04.firebaseapp.com");
+
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/q/sample-token/respond");
+        request.addHeader("Origin", "null");
+
+        CorsConfiguration cors = config.corsConfigurationSource().getCorsConfiguration(request);
+
+        assertThat(cors).isNotNull();
+        assertThat(cors.checkOrigin("null")).isEqualTo("null");
+        assertThat(cors.checkOrigin("android-app://com.whatsapp")).isEqualTo("android-app://com.whatsapp");
+        assertThat(cors.checkOrigin("https://random-mobile-browser.com")).isEqualTo("https://random-mobile-browser.com");
     }
 
     @Test
