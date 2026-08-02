@@ -106,6 +106,20 @@ class SecurityConfigCorsTest {
     }
 
     @Test
+    void productionConfigurationAllowsRenderDomainOriginsByDefault() {
+        SecurityConfig config = new SecurityConfig(null, null,
+                new MockEnvironment().withProperty("spring.profiles.active", "prod"));
+        ReflectionTestUtils.setField(config, "allowedOrigins", "https://mybill-app-04.firebaseapp.com");
+
+        CorsConfiguration cors = config.corsConfigurationSource()
+                .getCorsConfiguration(preflightRequest("https://my-custom-app.onrender.com"));
+
+        assertThat(cors).isNotNull();
+        assertThat(cors.checkOrigin("https://my-custom-app.onrender.com"))
+                .isEqualTo("https://my-custom-app.onrender.com");
+    }
+
+    @Test
     void rateLimitFilterIsRegisteredAtHighestPrecedence() {
         RateLimitFilter filter = new RateLimitFilter(mock(SecurityUtils.class));
         SecurityConfig config = new SecurityConfig(null, filter, new MockEnvironment());
