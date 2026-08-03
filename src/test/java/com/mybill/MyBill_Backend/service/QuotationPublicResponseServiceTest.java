@@ -66,7 +66,7 @@ class QuotationPublicResponseServiceTest {
     @Test
     @DisplayName("Hash token generates consistent SHA-256 hex string")
     void testHashToken() {
-        String token = "sample-raw-token-12345";
+        String token = QuotationPublicResponseService.generateRandomToken();
         String hash1 = QuotationPublicResponseService.hashToken(token);
         String hash2 = QuotationPublicResponseService.hashToken(token);
 
@@ -152,5 +152,16 @@ class QuotationPublicResponseServiceTest {
         QuotationPublicResponseService.ResponseSubmissionResult result =
                 publicResponseService.processClientResponse(rawToken, "ACCEPT", null, "127.0.0.1", "TestAgent");
         assertThat(result.success()).isFalse();
+    }
+
+    @Test
+    @DisplayName("A quotation UUID cannot be used as a public capability token")
+    void rejectsRawQuotationUuidWithoutLookingItUp() {
+        QuotationPublicResponseService.PublicQuotationView view =
+                publicResponseService.getPublicQuotationView(sampleQuotation.getId().toString());
+
+        assertThat(view.isValid()).isFalse();
+        verify(quotationRepository, never()).findById(sampleQuotation.getId());
+        verify(quotationRepository, never()).save(any());
     }
 }

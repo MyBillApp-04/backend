@@ -37,4 +37,5 @@ public class QuotationSyncPayload {
 
     private String deviceId;
     private String userKey;
+    private String publicToken;
 }

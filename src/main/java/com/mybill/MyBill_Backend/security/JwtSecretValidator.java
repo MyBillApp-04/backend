@@ -13,6 +13,7 @@ public class JwtSecretValidator {
 
     private static final Set<String> WEAK_SECRETS = new HashSet<>(Arrays.asList(
             "secret", "password", "mybill", "mybillsecret", "changeit", "development", "jwtsecret",
+            "dev-only-local-jwt-secret-please-override-64-chars-minimum-2026",
             "12345678901234567890123456789012", "abcdefghijklmnopqrstuvwxyzabcdef",
             "qwertyuiopasdfghjklzxcvbnmqwerty"
     ));

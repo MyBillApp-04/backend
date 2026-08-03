@@ -1,0 +1,49 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'team', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: default
+
+  routes:
+    # Critical alerts go to PagerDuty or primary on-call
+    - matchers:
+        - severity = "critical"
+      receiver: critical-alerts
+      repeat_interval: 1h
+
+    # Security alerts go to a dedicated security channel
+    - matchers:
+        - team = "security"
+      receiver: security-alerts
+      repeat_interval: 2h
+
+receivers:
+  - name: default
+    webhook_configs:
+      - url: "${ALERTMANAGER_WEBHOOK_URL}"
+        send_resolved: true
+        http_config:
+          tls_config:
+            insecure_skip_verify: false
+
+  - name: critical-alerts
+    webhook_configs:
+      - url: "${ALERTMANAGER_CRITICAL_WEBHOOK_URL}"
+        send_resolved: true
+
+  - name: security-alerts
+    webhook_configs:
+      - url: "${ALERTMANAGER_SECURITY_WEBHOOK_URL}"
+        send_resolved: true
+
+inhibit_rules:
+  # If the service is completely down, suppress lower-severity alerts for the same instance
+  - source_matchers:
+      - alertname = "ServiceDown"
+    target_matchers:
+      - severity =~ "warning|info"
+    equal: ['instance']

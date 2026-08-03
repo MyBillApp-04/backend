@@ -3,8 +3,7 @@ ALTER TABLE public.payments
 
 UPDATE public.payments
 SET applied_to_invoice = true
-WHERE stripe_status = 'succeeded'
-  AND COALESCE(is_deleted, false) = false
+WHERE COALESCE(is_deleted, false) = false
   AND applied_to_invoice = false;
 
 CREATE INDEX IF NOT EXISTS idx_payments_user_applied

@@ -4,6 +4,8 @@ import com.mybill.MyBill_Backend.entity.User;
 import com.mybill.MyBill_Backend.entity.UserDeviceToken;
 import com.mybill.MyBill_Backend.repository.UserDeviceTokenRepository;
 import com.mybill.MyBill_Backend.util.SecurityUtils;
+import com.mybill.MyBill_Backend.dto.DeviceTokenRequest;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,18 +27,14 @@ public class DeviceTokenController {
     }
 
     @PostMapping
-    public ResponseEntity<?> registerDeviceToken(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<?> registerDeviceToken(@Valid @RequestBody DeviceTokenRequest payload) {
         User user = securityUtils.getCurrentUser();
         if (user == null) {
             return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
         }
 
-        String fcmToken = payload.get("fcmToken");
-        if (fcmToken == null || fcmToken.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "fcmToken is required"));
-        }
-
-        String platform = payload.getOrDefault("platform", "UNKNOWN").toUpperCase();
+        String fcmToken = payload.fcmToken();
+        String platform = payload.platform() == null ? "UNKNOWN" : payload.platform().toUpperCase();
 
         Optional<UserDeviceToken> existing = deviceTokenRepository.findByUserIdAndFcmToken(user.getId(), fcmToken.trim());
         UserDeviceToken tokenEntity;

@@ -11,14 +11,22 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
+import jakarta.validation.Validator;
 
 @RestController
 @RequestMapping("/api/invoice/settings")
-@RequiredArgsConstructor
 public class InvoiceSettingsController {
 
     private final InvoiceSettingsService settingsService;
     private final ObjectMapper objectMapper;
+    private final Validator validator;
+
+    public InvoiceSettingsController(InvoiceSettingsService settingsService, ObjectMapper objectMapper, Validator validator) {
+        this.settingsService = settingsService;
+        this.objectMapper = objectMapper;
+        this.validator = validator;
+    }
 
     @GetMapping
     public ResponseEntity<InvoiceSettings> getSettings() {
@@ -26,7 +34,7 @@ public class InvoiceSettingsController {
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<InvoiceSettings> updateSettings(@RequestBody InvoiceSettingsRequest settings) {
+    public ResponseEntity<InvoiceSettings> updateSettings(@Valid @RequestBody InvoiceSettingsRequest settings) {
         return ResponseEntity.ok(settingsService.saveOrUpdateSettings(settings));
     }
 
@@ -35,6 +43,9 @@ public class InvoiceSettingsController {
         try {
             InvoiceSettingsRequest settings =
                     objectMapper.readValue(body, InvoiceSettingsRequest.class);
+            if (!validator.validate(settings).isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invoice settings payload is invalid");
+            }
             return ResponseEntity.ok(settingsService.saveOrUpdateSettings(settings));
         } catch (JsonProcessingException ex) {
             throw new ResponseStatusException(

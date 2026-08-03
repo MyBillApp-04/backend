@@ -63,7 +63,6 @@ public class FirebaseConfig {
 
     InputStream getFirebaseServiceAccount() throws IOException {
         String firebaseConfigJson = firstNonBlank(
-                System.getenv(FIREBASE_ENV_KEY),
                 environment.getProperty(FIREBASE_PROPERTY_KEY),
                 environment.getProperty(FIREBASE_ENV_KEY)
         );

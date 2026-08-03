@@ -2,6 +2,7 @@ package com.mybill.MyBill_Backend.controller;
 
 import com.mybill.MyBill_Backend.entity.User;
 import com.mybill.MyBill_Backend.entity.UserDeviceToken;
+import com.mybill.MyBill_Backend.dto.DeviceTokenRequest;
 import com.mybill.MyBill_Backend.repository.UserDeviceTokenRepository;
 import com.mybill.MyBill_Backend.util.SecurityUtils;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +47,7 @@ class DeviceTokenControllerTest {
         when(deviceTokenRepository.findByUserIdAndFcmToken(10L, "fcm-token-12345")).thenReturn(Optional.empty());
 
         ResponseEntity<?> response = deviceTokenController.registerDeviceToken(
-                Map.of("fcmToken", "fcm-token-12345", "platform", "ANDROID"));
+                new DeviceTokenRequest("fcm-token-12345", "ANDROID"));
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         verify(deviceTokenRepository).save(any(UserDeviceToken.class));
@@ -60,7 +61,7 @@ class DeviceTokenControllerTest {
         when(deviceTokenRepository.findByUserIdAndFcmToken(10L, "fcm-token-12345")).thenReturn(Optional.of(existing));
 
         ResponseEntity<?> response = deviceTokenController.registerDeviceToken(
-                Map.of("fcmToken", "fcm-token-12345", "platform", "IOS"));
+                new DeviceTokenRequest("fcm-token-12345", "IOS"));
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(existing.getPlatform()).isEqualTo("IOS");

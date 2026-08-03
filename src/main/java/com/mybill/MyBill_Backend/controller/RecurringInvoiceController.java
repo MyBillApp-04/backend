@@ -1,6 +1,7 @@
 package com.mybill.MyBill_Backend.controller;
 
 import com.mybill.MyBill_Backend.dto.RecurringInvoiceScheduleDTO;
+import com.mybill.MyBill_Backend.dto.RecurringStatusRequest;
 import com.mybill.MyBill_Backend.entity.RecurringInvoiceSchedule;
 import com.mybill.MyBill_Backend.service.RecurringInvoiceScheduleService;
 import jakarta.validation.Valid;
@@ -54,9 +55,9 @@ public class RecurringInvoiceController {
     @PutMapping("/{id}/status")
     public ResponseEntity<RecurringInvoiceScheduleDTO> updateStatus(
             @PathVariable UUID id,
-            @RequestParam String status
+            @Valid @RequestBody RecurringStatusRequest status
     ) {
-        RecurringInvoiceSchedule updated = scheduleService.setScheduleStatus(id, status);
+        RecurringInvoiceSchedule updated = scheduleService.setScheduleStatus(id, status.status().name());
         return ResponseEntity.ok(toDTO(updated));
     }
 

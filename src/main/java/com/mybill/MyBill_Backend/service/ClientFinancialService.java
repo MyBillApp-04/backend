@@ -12,6 +12,7 @@ import com.mybill.MyBill_Backend.util.SecurityUtils;
 import com.mybill.MyBill_Backend.exception.ForbiddenException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,8 @@ public class ClientFinancialService {
     private final PaymentRepository paymentRepository;
     private final SecurityUtils securityUtils;
     private final ApplicationEventPublisher eventPublisher;
+    private final FraudDetectionService fraudDetectionService;
+    private final com.mybill.MyBill_Backend.observability.AppMetrics appMetrics;
 
     @Transactional(readOnly = true)
     public double getAdvanceBalance(UUID clientId, Long userId) {
@@ -95,6 +98,7 @@ public class ClientFinancialService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "clientFinancialSummary", key = "#clientId.toString() + '_' + @securityUtils.getCurrentUserId()")
     public ClientFinancialSummaryDTO getSummary(UUID clientId) {
         Long userId = securityUtils.getCurrentUserId();
         clientRepository.findByIdAndUserIdAndIsDeletedFalse(clientId, userId)
@@ -130,7 +134,7 @@ public class ClientFinancialService {
         return ledgerRepository.findByClientIdAndUserIdAndIsDeletedFalseOrderByTransactionDateDesc(clientId, userId, pageable);
     }
 
-    @CacheEvict(value = "dashboardStats", allEntries = true)
+    @CacheEvict(value = {"dashboardStats", "clientFinancialSummary"}, allEntries = true)
     public ReceivePaymentResponse receivePayment(UUID clientId, ReceivePaymentRequest request) {
         Long userId = securityUtils.getCurrentUserId();
         User user = securityUtils.getCurrentUser();
@@ -153,7 +157,15 @@ public class ClientFinancialService {
                 .refundedAmount(0.0)
                 .appliedToInvoice(false)
                 .build();
+        long paymentStart = System.currentTimeMillis();
         Payment savedPayment = paymentRepository.save(payment);
+        appMetrics.getPaymentsReceived().increment();
+        try {
+            fraudDetectionService.evaluatePayment(savedPayment);
+        } catch (Exception e) {
+            // Log warning but do not block payment flow in production if fraud evaluation fails
+        }
+        appMetrics.recordPaymentDuration(System.currentTimeMillis() - paymentStart);
 
         double remainingReceipt = amount;
         double appliedToInvoices = 0.0;

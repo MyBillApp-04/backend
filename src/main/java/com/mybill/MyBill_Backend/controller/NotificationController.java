@@ -2,6 +2,8 @@ package com.mybill.MyBill_Backend.controller;
 
 import com.mybill.MyBill_Backend.entity.Notification;
 import com.mybill.MyBill_Backend.service.NotificationService;
+import com.mybill.MyBill_Backend.dto.NotificationRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -37,16 +39,9 @@ public class NotificationController {
 
     @PostMapping
     public ResponseEntity<Notification> createNotification(
-            @RequestBody Map<String, String> body
+            @Valid @RequestBody NotificationRequest body
     ) {
-        String title = body.get("title");
-        String message = body.get("message");
-
-        if (title == null || title.isBlank()) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        Notification notification = notificationService.createNotification(title, message);
+        Notification notification = notificationService.createNotification(body.title(), body.message());
         return ResponseEntity.status(HttpStatus.CREATED).body(notification);
     }
 

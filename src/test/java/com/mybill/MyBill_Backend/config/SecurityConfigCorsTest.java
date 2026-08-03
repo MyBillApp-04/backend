@@ -106,7 +106,7 @@ class SecurityConfigCorsTest {
     }
 
     @Test
-    void productionConfigurationAllowsRenderDomainOriginsByDefault() {
+    void productionConfigurationRejectsUnconfiguredRenderDomainOrigins() {
         SecurityConfig config = new SecurityConfig(null, null,
                 new MockEnvironment().withProperty("spring.profiles.active", "prod"));
         ReflectionTestUtils.setField(config, "allowedOrigins", "https://mybill-app-04.firebaseapp.com");
@@ -115,10 +115,8 @@ class SecurityConfigCorsTest {
                 .getCorsConfiguration(preflightRequest("https://my-custom-app.onrender.com"));
 
         assertThat(cors).isNotNull();
-        assertThat(cors.checkOrigin("https://my-custom-app.onrender.com"))
-                .isEqualTo("https://my-custom-app.onrender.com");
-        assertThat(cors.checkOrigin("http://my-custom-app.onrender.com"))
-                .isEqualTo("http://my-custom-app.onrender.com");
+        assertThat(cors.checkOrigin("https://my-custom-app.onrender.com")).isNull();
+        assertThat(cors.checkOrigin("http://my-custom-app.onrender.com")).isNull();
     }
 
     @Test

@@ -5,7 +5,7 @@
 - `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`
 - `JWT_SECRET` (long, unique production value)
 - `ALLOWED_ORIGINS` (comma-separated, actual web origins only; leave unset for Android-only releases)
-- Firebase, Stripe, mail, and backup variables used by the enabled features
+- Firebase, mail, and backup variables used by the enabled features
 
 The backend runs Flyway and Hibernate validation at startup. Never edit a
 released migration or run `flyway repair` as a workaround for a checksum

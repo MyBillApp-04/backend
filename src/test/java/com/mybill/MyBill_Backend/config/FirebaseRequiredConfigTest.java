@@ -14,6 +14,7 @@ class FirebaseRequiredConfigTest {
     void rejectsMissingFirebaseConfigInProd() {
         MockEnvironment environment = new MockEnvironment()
                 .withProperty("spring.profiles.active", "prod");
+        environment.setActiveProfiles("prod");
 
         assertThatThrownBy(() -> config.requireFirebaseInProd(environment).run(null))
                 .isInstanceOf(IllegalStateException.class)
@@ -25,6 +26,7 @@ class FirebaseRequiredConfigTest {
         MockEnvironment environment = new MockEnvironment()
                 .withProperty("spring.profiles.active", "prod")
                 .withProperty("firebase.config.json", "{\"type\":\"service_account\"}");
+        environment.setActiveProfiles("prod");
 
         assertThatCode(() -> config.requireFirebaseInProd(environment).run(null))
                 .doesNotThrowAnyException();
@@ -34,6 +36,7 @@ class FirebaseRequiredConfigTest {
     void allowsMissingFirebaseConfigOutsideProd() {
         MockEnvironment environment = new MockEnvironment()
                 .withProperty("spring.profiles.active", "dev");
+        environment.setActiveProfiles("dev");
 
         assertThatCode(() -> config.requireFirebaseInProd(environment).run(null))
                 .doesNotThrowAnyException();

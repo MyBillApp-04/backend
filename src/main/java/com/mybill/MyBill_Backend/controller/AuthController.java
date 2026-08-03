@@ -2,10 +2,14 @@ package com.mybill.MyBill_Backend.controller;
 
 import com.mybill.MyBill_Backend.entity.AuthProvider;
 import com.mybill.MyBill_Backend.entity.Role;
+import com.mybill.MyBill_Backend.entity.User;
+import com.mybill.MyBill_Backend.dto.FirebaseLoginRequest;
+import com.mybill.MyBill_Backend.dto.RefreshTokenRequest;
 import com.mybill.MyBill_Backend.observability.SecureLogMessageConverter;
 import com.mybill.MyBill_Backend.security.JwtTokenDenylist;
 import com.mybill.MyBill_Backend.security.JwtUtil;
 import com.mybill.MyBill_Backend.service.AuthService;
+import com.mybill.MyBill_Backend.service.RefreshTokenService;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseToken;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -29,19 +34,15 @@ public class AuthController {
     private final MeterRegistry meterRegistry;
     private final JwtUtil jwtUtil;
     private final JwtTokenDenylist tokenDenylist;
+    private final RefreshTokenService refreshTokenService;
 
     @PostMapping("/firebase-login")
     public ResponseEntity<?> firebaseLogin(
-            @RequestBody Map<String, String> body,
+            @Valid @RequestBody FirebaseLoginRequest body,
             @RequestHeader(name = "X-Auth-Flow", defaultValue = "login") String requestedFlow
     ) {
         String flow = "refresh".equalsIgnoreCase(requestedFlow) ? "refresh" : "login";
-        String idToken = body.get("token");
-
-        if (idToken == null || idToken.isBlank()) {
-            recordAuthResult("auth_failure", flow, "missing_token");
-            return ResponseEntity.badRequest().body(Map.of("error", "Missing token in request body"));
-        }
+        String idToken = body.token();
 
         try {
             FirebaseToken decodedToken = verifyIdToken(idToken);
@@ -77,10 +78,11 @@ public class AuthController {
                 name = email.split("@")[0];
             }
 
-            String jwt = authService.firebaseLogin(email, name, provider, Role.OWNER);
+            User user = authService.firebaseLoginUser(email, name, provider, Role.OWNER);
+            RefreshTokenService.TokenPair tokens = refreshTokenService.issue(user);
             recordAuthResult("auth_success", flow, "accepted");
             log.info("Successful login via {}", provider);
-            return ResponseEntity.ok(Map.of("token", jwt));
+            return ResponseEntity.ok(Map.of("token", tokens.accessToken(), "refreshToken", tokens.refreshToken()));
 
         } catch (Exception e) {
             recordAuthResult("auth_failure", flow, "server_error");
@@ -103,29 +105,20 @@ public class AuthController {
     }
 
     protected FirebaseToken verifyIdToken(String idToken) throws Exception {
-        try {
-            return FirebaseAuth.getInstance().verifyIdToken(idToken, true);
-        } catch (IllegalStateException e) {
-            log.warn("FirebaseApp is not initialized (FIREBASE_CONFIG_JSON missing). Decoding unverified Firebase token in local dev mode.");
-            return decodeUnverifiedFirebaseToken(idToken);
-        }
+        // Authentication must always be verified by Firebase Admin. In particular, never
+        // trust claims decoded from an unsigned/unverified client token in local or prod.
+        return FirebaseAuth.getInstance().verifyIdToken(idToken, true);
     }
 
-    private FirebaseToken decodeUnverifiedFirebaseToken(String idToken) throws Exception {
-        String[] parts = idToken.split("\\.");
-        if (parts.length < 2) {
-            throw new IllegalArgumentException("Malformed ID token");
-        }
-        String payloadJson = new String(java.util.Base64.getUrlDecoder().decode(parts[1]), java.nio.charset.StandardCharsets.UTF_8);
-        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-        Map<String, Object> claims = mapper.readValue(payloadJson, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         try {
-            java.lang.reflect.Constructor<FirebaseToken> ctor = FirebaseToken.class.getDeclaredConstructor(Map.class);
-            ctor.setAccessible(true);
-            return ctor.newInstance(claims);
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to parse local Firebase token: " + e.getMessage(), e);
+            RefreshTokenService.TokenPair tokens = refreshTokenService.rotate(request.refreshToken());
+            recordAuthResult("auth_success", "refresh", "accepted");
+            return ResponseEntity.ok(Map.of("token", tokens.accessToken(), "refreshToken", tokens.refreshToken()));
+        } catch (RefreshTokenService.InvalidRefreshTokenException ex) {
+            recordAuthResult("auth_failure", "refresh", "invalid_token");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired refresh token"));
         }
     }
 
@@ -135,6 +128,7 @@ public class AuthController {
         if (token != null && jwtUtil.validateToken(token)) {
             tokenDenylist.deny(token, jwtUtil.extractExpiration(token));
         }
+        refreshTokenService.revoke(request.getHeader("X-Refresh-Token"));
         return ResponseEntity.ok(Map.of("message", "Logged out"));
     }
 

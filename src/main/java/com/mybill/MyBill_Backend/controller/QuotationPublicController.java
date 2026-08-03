@@ -5,9 +5,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.validation.annotation.Validated;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 @Controller
 @RequestMapping("/q")
+@Validated
 public class QuotationPublicController {
 
     private final QuotationPublicResponseService publicResponseService;
@@ -17,7 +21,7 @@ public class QuotationPublicController {
     }
 
     @GetMapping("/{token}")
-    public String showPublicQuotationPage(@PathVariable("token") String token, Model model) {
+    public String showPublicQuotationPage(@PathVariable("token") @Pattern(regexp = "^[A-Za-z0-9_-]{43}$") String token, Model model) {
         QuotationPublicResponseService.PublicQuotationView view = publicResponseService.getPublicQuotationView(token);
         model.addAttribute("view", view);
 
@@ -30,9 +34,9 @@ public class QuotationPublicController {
 
     @PostMapping("/{token}/respond")
     public String submitResponse(
-            @PathVariable("token") String token,
-            @RequestParam("action") String action,
-            @RequestParam(value = "message", required = false) String message,
+            @PathVariable("token") @Pattern(regexp = "^[A-Za-z0-9_-]{43}$") String token,
+            @RequestParam("action") @Pattern(regexp = "(?i)ACCEPT(?:ED)?|DECLINE(?:D)?|REJECTED|DISCUSS(?:ION(?:_REQUESTED)?)?") String action,
+            @RequestParam(value = "message", required = false) @Size(max = 2000) String message,
             HttpServletRequest request,
             Model model) {
 

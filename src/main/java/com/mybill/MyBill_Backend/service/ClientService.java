@@ -24,6 +24,7 @@ public class ClientService {
     private final ClientRepository clientRepository;
     private final ClientWorkRepository workRepository;
     private final SecurityUtils securityUtils;
+    private final AuditTrailService auditTrailService;
 
     public Client createClient(Client client) {
         if (client.getId() == null) {
@@ -39,7 +40,9 @@ public class ClientService {
         client.setIsDeleted(client.getIsDeleted() != null ? client.getIsDeleted() : false);
         client.setVersion(client.getVersion() != null ? client.getVersion() : 1);
 
-        return clientRepository.save(client);
+        Client savedClient = clientRepository.save(client);
+        auditTrailService.logChange("Client", savedClient.getId(), "CREATE", "Created client: " + savedClient.getName());
+        return savedClient;
     }
 
     @Transactional(readOnly = true)
@@ -78,7 +81,9 @@ public class ClientService {
             client.setUpdatedAt(updatedClient.getUpdatedAt());
         }
 
-        return clientRepository.save(client);
+        Client savedClient = clientRepository.save(client);
+        auditTrailService.logChange("Client", savedClient.getId(), "UPDATE", "Updated client details: name=" + savedClient.getName());
+        return savedClient;
     }
 
     public void deleteClient(UUID id) {
@@ -86,6 +91,7 @@ public class ClientService {
         client.markDeleted(LocalDateTime.now());
 
         clientRepository.save(client);
+        auditTrailService.logChange("Client", client.getId(), "DELETE", "Soft deleted client");
     }
 
     @Transactional(readOnly = true)

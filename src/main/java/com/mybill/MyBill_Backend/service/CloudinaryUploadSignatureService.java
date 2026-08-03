@@ -21,6 +21,9 @@ import java.util.UUID;
 public class CloudinaryUploadSignatureService {
 
     private static final Set<String> SUPPORTED_TYPES = Set.of("logo", "qr", "signature");
+    private static final String ALLOWED_FORMATS = "png,jpg,jpeg,webp";
+    private static final long MAX_BYTES = 5 * 1024 * 1024;
+    private static final int MAX_DIMENSION = 4096;
 
     private final SecurityUtils securityUtils;
 
@@ -32,6 +35,9 @@ public class CloudinaryUploadSignatureService {
 
     @Value("${app.cloudinary.api-secret:}")
     private String apiSecret;
+
+    @Value("${app.cloudinary.upload-preset:mybill_restricted_images}")
+    private String uploadPreset;
 
     public CloudinarySignature createSignature(String imageType) {
         if (!SUPPORTED_TYPES.contains(imageType)) {
@@ -46,11 +52,17 @@ public class CloudinaryUploadSignatureService {
         String folder = "mybill/" + userId + "/" + imageType;
         String publicId = imageType + "_" + UUID.randomUUID();
         String signature = sha1("folder=" + folder
+                + "&allowed_formats=" + ALLOWED_FORMATS
+                + "&max_file_size=" + MAX_BYTES
+                + "&max_image_height=" + MAX_DIMENSION
+                + "&max_image_width=" + MAX_DIMENSION
                 + "&public_id=" + publicId
                 + "&timestamp=" + timestamp
+                + "&upload_preset=" + uploadPreset
                 + apiSecret.trim());
 
-        return new CloudinarySignature(cloudName, apiKey, timestamp, folder, publicId, signature);
+        return new CloudinarySignature(cloudName, apiKey, timestamp, timestamp + 300, folder, publicId, signature,
+                uploadPreset, ALLOWED_FORMATS, MAX_BYTES, MAX_DIMENSION, MAX_DIMENSION);
     }
 
     private String sha1(String value) {
@@ -70,18 +82,25 @@ public class CloudinaryUploadSignatureService {
             String cloudName,
             String apiKey,
             long timestamp,
+            long expiresAt,
             String folder,
             String publicId,
-            String signature
+            String signature,
+            String uploadPreset,
+            String allowedFormats,
+            long maxFileSize,
+            int maxImageWidth,
+            int maxImageHeight
     ) {
         public Map<String, Object> toResponse() {
-            return Map.of(
-                    "cloudName", cloudName,
-                    "apiKey", apiKey,
-                    "timestamp", timestamp,
-                    "folder", folder,
-                    "publicId", publicId,
-                    "signature", signature
+            return Map.ofEntries(
+                    Map.entry("cloudName", cloudName), Map.entry("apiKey", apiKey),
+                    Map.entry("timestamp", timestamp), Map.entry("expiresAt", expiresAt),
+                    Map.entry("folder", folder), Map.entry("publicId", publicId),
+                    Map.entry("signature", signature), Map.entry("resourceType", "image"),
+                    Map.entry("uploadPreset", uploadPreset), Map.entry("allowedFormats", allowedFormats),
+                    Map.entry("maxFileSize", maxFileSize), Map.entry("maxImageWidth", maxImageWidth),
+                    Map.entry("maxImageHeight", maxImageHeight)
             );
         }
     }

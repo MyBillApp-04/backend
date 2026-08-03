@@ -50,9 +50,11 @@ public class InvoiceService {
     private final InvoiceNumberService invoiceNumberService;
     private final ClientFinancialService clientFinancialService;
     private final ApplicationEventPublisher eventPublisher;
+    private final AuditTrailService auditTrailService;
+    private final com.mybill.MyBill_Backend.observability.AppMetrics appMetrics;
 
     @Transactional
-    @CacheEvict(value = "dashboardStats", allEntries = true)
+    @CacheEvict(value = {"dashboardStats", "clientFinancialSummary"}, allEntries = true)
     public Invoice generateInvoice(
             UUID clientId,
             List<UUID> workIds,
@@ -65,7 +67,7 @@ public class InvoiceService {
     }
 
     @Transactional
-    @CacheEvict(value = "dashboardStats", allEntries = true)
+    @CacheEvict(value = {"dashboardStats", "clientFinancialSummary"}, allEntries = true)
     public Invoice generateInvoiceForUser(
             UUID clientId,
             List<UUID> workIds,
@@ -157,7 +159,7 @@ public class InvoiceService {
                         .quantity(work.getQuantity())
                         .amount(work.getAmount())
                         .build())
-                .toList();
+                .collect(java.util.stream.Collectors.toList());
 
         invoice.setItems(items);
 
@@ -170,6 +172,8 @@ public class InvoiceService {
         workRepository.saveAll(works);
 
         Invoice savedInvoice = invoiceRepository.save(invoice);
+        appMetrics.getInvoicesGenerated().increment();
+        auditTrailService.logChange("Invoice", savedInvoice.getId(), "CREATE", "Invoice generated with total " + savedInvoice.getTotalAmount());
         clientFinancialService.recordInvoiceCreated(savedInvoice, now);
         if (advanceApplied > 0) {
             clientFinancialService.applyAdvanceToInvoice(savedInvoice, advanceApplied, now);
@@ -181,7 +185,7 @@ public class InvoiceService {
     }
 
     @Transactional
-    @CacheEvict(value = "dashboardStats", allEntries = true)
+    @CacheEvict(value = {"dashboardStats", "clientFinancialSummary"}, allEntries = true)
     public Invoice updatePayment(
             UUID invoiceId,
             Double paidAmount,
@@ -226,12 +230,16 @@ public class InvoiceService {
         invoice.setUpdatedAt(LocalDateTime.now());
 
         Invoice saved = invoiceRepository.save(invoice);
+        if (PaymentStatus.PAID.equals(saved.getPaymentStatus())) {
+            appMetrics.getInvoicesFullyPaid().increment();
+        }
+        auditTrailService.logChange("Invoice", saved.getId(), "UPDATE", "Recorded payment: paid " + saved.getPaidAmount() + ", pending " + saved.getPendingAmount());
         eventPublisher.publishEvent(new InvoiceUpdatedEvent(this, saved));
         return saved;
     }
 
     @Transactional
-    @CacheEvict(value = "dashboardStats", allEntries = true)
+    @CacheEvict(value = {"dashboardStats", "clientFinancialSummary"}, allEntries = true)
     public Invoice updatePaymentForUser(
             UUID invoiceId,
             Long userId,
@@ -246,7 +254,7 @@ public class InvoiceService {
     }
 
     @Transactional
-    @CacheEvict(value = "dashboardStats", allEntries = true)
+    @CacheEvict(value = {"dashboardStats", "clientFinancialSummary"}, allEntries = true)
     public Invoice addPaymentForUser(
             UUID invoiceId,
             Long userId,
@@ -268,7 +276,7 @@ public class InvoiceService {
     }
 
     @Transactional
-    @CacheEvict(value = "dashboardStats", allEntries = true)
+    @CacheEvict(value = {"dashboardStats", "clientFinancialSummary"}, allEntries = true)
     public Invoice subtractPaymentForUser(
             UUID invoiceId,
             Long userId,
@@ -554,6 +562,7 @@ public class InvoiceService {
         invoice.markDeleted(now);
 
         invoiceRepository.save(invoice);
+        auditTrailService.logChange("Invoice", invoice.getId(), "DELETE", "Soft deleted invoice");
     }
 
     private double roundMoney(double value) {

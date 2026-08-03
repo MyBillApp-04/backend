@@ -5,6 +5,7 @@ import com.mybill.MyBill_Backend.dto.InvoiceSettingsRequest;
 import com.mybill.MyBill_Backend.entity.InvoiceSettings;
 import com.mybill.MyBill_Backend.service.InvoiceSettingsService;
 import org.junit.jupiter.api.Test;
+import jakarta.validation.Validation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -15,7 +16,7 @@ class InvoiceSettingsControllerTest {
 
     private final InvoiceSettingsService service = mock(InvoiceSettingsService.class);
     private final InvoiceSettingsController controller =
-            new InvoiceSettingsController(service, new ObjectMapper());
+            new InvoiceSettingsController(service, new ObjectMapper(), Validation.buildDefaultValidatorFactory().getValidator());
 
     @Test
     void acceptsJsonPayloadSentAsTextPlainForOlderApkCompatibility() {

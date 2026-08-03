@@ -68,6 +68,9 @@ public class ClientLedgerEntry {
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;
 
+    @Column(name = "change_log", columnDefinition = "text")
+    private String changeLog;
+
     @Builder.Default
     @Column(nullable = false)
     private Boolean isDeleted = false;

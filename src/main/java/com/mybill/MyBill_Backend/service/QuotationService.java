@@ -78,10 +78,8 @@ public class QuotationService {
                 .version(1)
                 .build();
 
-        String rawToken = (dto.getPublicToken() != null && !dto.getPublicToken().isBlank())
-                ? dto.getPublicToken().trim()
-                : quotation.getId().toString().replaceAll("-", "");
-        String tokenHash = hashToken(rawToken);
+        // Public links are capability tokens, never predictable quotation identifiers.
+        String tokenHash = QuotationPublicResponseService.hashToken(QuotationPublicResponseService.generateRandomToken());
         quotation.setPublicTokenHash(tokenHash);
         quotation.setTokenCreatedAt(LocalDateTime.now());
         quotation.setTokenExpiresAt(dto.getValidUntilDate() != null ? dto.getValidUntilDate() : LocalDateTime.now().plusDays(30));

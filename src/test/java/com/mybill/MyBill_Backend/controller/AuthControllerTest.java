@@ -4,7 +4,9 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseToken;
 import com.mybill.MyBill_Backend.entity.AuthProvider;
 import com.mybill.MyBill_Backend.entity.Role;
+import com.mybill.MyBill_Backend.entity.User;
 import com.mybill.MyBill_Backend.service.AuthService;
+import com.mybill.MyBill_Backend.service.RefreshTokenService;
 import com.mybill.MyBill_Backend.security.RateLimitFilter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.AfterEach;
@@ -39,6 +41,9 @@ public class AuthControllerTest {
 
     @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private RefreshTokenService refreshTokenService;
 
     @Autowired
     private RateLimitFilter rateLimitFilter;
@@ -90,8 +95,10 @@ public class AuthControllerTest {
         claims.put("firebase", firebaseClaim);
 
         when(firebaseToken.getClaims()).thenReturn(claims);
-        when(authService.firebaseLogin(eq(testEmail), eq(testName), eq(AuthProvider.GOOGLE), eq(Role.OWNER)))
-                .thenReturn(testJwt);
+        User user = User.builder().email(testEmail).role(Role.OWNER).build();
+        when(authService.firebaseLoginUser(eq(testEmail), eq(testName), eq(AuthProvider.GOOGLE), eq(Role.OWNER)))
+                .thenReturn(user);
+        when(refreshTokenService.issue(user)).thenReturn(new RefreshTokenService.TokenPair(testJwt, "refresh-token"));
         double before = counterValue("auth_success", "refresh", "accepted");
 
         mockMvc.perform(post("/api/auth/firebase-login")
@@ -99,12 +106,13 @@ public class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"token\":\"valid-google-id-token\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").value(testJwt));
+                .andExpect(jsonPath("$.token").value(testJwt))
+                .andExpect(jsonPath("$.refreshToken").value("refresh-token"));
 
         org.assertj.core.api.Assertions.assertThat(
                 counterValue("auth_success", "refresh", "accepted") - before
         ).isEqualTo(1.0);
-        verify(authService, times(1)).firebaseLogin(eq(testEmail), eq(testName), eq(AuthProvider.GOOGLE), eq(Role.OWNER));
+        verify(authService).firebaseLoginUser(eq(testEmail), eq(testName), eq(AuthProvider.GOOGLE), eq(Role.OWNER));
     }
 
     @Test
@@ -122,8 +130,10 @@ public class AuthControllerTest {
         claims.put("firebase", firebaseClaim);
 
         when(firebaseToken.getClaims()).thenReturn(claims);
-        when(authService.firebaseLogin(eq(testEmail), eq(testName), eq(AuthProvider.LOCAL), eq(Role.OWNER)))
-                .thenReturn(testJwt);
+        User user = User.builder().email(testEmail).role(Role.OWNER).build();
+        when(authService.firebaseLoginUser(eq(testEmail), eq(testName), eq(AuthProvider.LOCAL), eq(Role.OWNER)))
+                .thenReturn(user);
+        when(refreshTokenService.issue(user)).thenReturn(new RefreshTokenService.TokenPair(testJwt, "refresh-token"));
 
         mockMvc.perform(post("/api/auth/firebase-login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -131,7 +141,7 @@ public class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").value(testJwt));
 
-        verify(authService, times(1)).firebaseLogin(eq(testEmail), eq(testName), eq(AuthProvider.LOCAL), eq(Role.OWNER));
+        verify(authService).firebaseLoginUser(eq(testEmail), eq(testName), eq(AuthProvider.LOCAL), eq(Role.OWNER));
     }
 
     @Test
@@ -139,8 +149,7 @@ public class AuthControllerTest {
         mockMvc.perform(post("/api/auth/firebase-login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("Missing token in request body"));
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -157,6 +166,20 @@ public class AuthControllerTest {
         org.assertj.core.api.Assertions.assertThat(
                 counterValue("auth_failure", "login", "server_error") - before
         ).isEqualTo(1.0);
+    }
+
+    @Test
+    void testLoginRejectsWhenFirebaseAdminIsNotConfigured() throws Exception {
+        mockedFirebaseAuth.when(FirebaseAuth::getInstance)
+                .thenThrow(new IllegalStateException("FirebaseApp with name [DEFAULT] doesn't exist."));
+
+        mockMvc.perform(post("/api/auth/firebase-login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"unverified-client-token\"}"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.error").value("Server auth not configured. Contact admin."));
+
+        verifyNoInteractions(authService);
     }
 
     private double counterValue(String name, String flow, String outcome) {

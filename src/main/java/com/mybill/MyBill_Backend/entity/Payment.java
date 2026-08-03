@@ -54,10 +54,6 @@ public class Payment {
     @Column(columnDefinition = "text")
     private String notes;
 
-    private String stripePaymentIntentId;
-    private String stripeChargeId;
-    private String stripeRefundId;
-    private String stripeStatus;
     @Column(columnDefinition = "double precision")
     private Double refundedAmount;
 

@@ -2,8 +2,14 @@ package com.mybill.MyBill_Backend.security;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.mybill.MyBill_Backend.entity.RevokedToken;
+import com.mybill.MyBill_Backend.repository.RevokedTokenRepository;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -14,55 +20,93 @@ import java.util.Date;
 import java.util.HexFormat;
 
 /**
- * In-memory JWT token denylist using Caffeine cache.
+ * JWT token denylist backed by an in-memory L1 Caffeine cache and PostgreSQL persistent storage.
  *
- * <h3>Design & Architecture Considerations</h3>
- * <p>Tokens are denied when a user calls {@code /api/auth/logout}. The tokens are hashed using SHA-256
- * and stored with a 24-hour expiration (matching the default JWT lifetime).
- *
- * <p><strong>Single-Instance Constraints (Render Free Tier):</strong>
- * Because this denylist is stored in the JVM heap, it is ephemeral:
- * <ul>
- *   <li>It is reset whenever the application restarts or is redeployed.</li>
- *   <li>It is not shared across multiple nodes.</li>
- * </ul>
- * For the current single-instance deployment, this is acceptable, cost-effective, and has zero external dependency overhead.
- *
- * <p><strong>Production Scaling:</strong>
- * If the application is scaled horizontally (multi-instance/clustered) or requires persistent logout states across restarts,
- * this component must be replaced with a shared, persistent store:
- * <ul>
- *   <li><strong>Redis:</strong> Store token hashes as keys with a TTL matching the token's remaining lifetime.
- *       This is the industry standard for distributed token denylists.</li>
- *   <li><strong>Database Store:</strong> Log denied tokens in a relational table, cleaned up periodically by a background scheduled task.</li>
- * </ul>
+ * <p>Tokens are denied when a user calls {@code /api/auth/logout}. Token hashes (SHA-256) are saved to
+ * PostgreSQL to guarantee revocation persists across application restarts and across multi-instance clusters.
  */
 @Component
+@Slf4j
 public class JwtTokenDenylist {
 
     private final Cache<String, Boolean> deniedTokens;
+    private final RevokedTokenRepository revokedTokenRepository;
 
+    @Autowired
     public JwtTokenDenylist(
-            @Value("${app.security.jwt-denylist.cache-max-size:10000}") long cacheMaxSize
+            @Value("${app.security.jwt-denylist.cache-max-size:10000}") long cacheMaxSize,
+            @Autowired(required = false) RevokedTokenRepository revokedTokenRepository
     ) {
         this.deniedTokens = Caffeine.newBuilder()
                 .expireAfterWrite(Duration.ofHours(24))
                 .maximumSize(cacheMaxSize)
                 .build();
+        this.revokedTokenRepository = revokedTokenRepository;
     }
 
+    public JwtTokenDenylist(long cacheMaxSize) {
+        this(cacheMaxSize, null);
+    }
+
+    @Transactional
     public void deny(String token, Date expiresAt) {
         if (token == null || token.isBlank()) return;
 
         Instant expiry = expiresAt == null ? Instant.now().plus(Duration.ofHours(24)) : expiresAt.toInstant();
-        if (expiry.isAfter(Instant.now())) {
-            deniedTokens.put(hash(token), true);
+        Instant now = Instant.now();
+        if (expiry.isAfter(now)) {
+            String tokenHash = hash(token);
+            deniedTokens.put(tokenHash, true);
+
+            if (revokedTokenRepository != null) {
+                try {
+                    if (!revokedTokenRepository.existsByTokenHash(tokenHash)) {
+                        RevokedToken revokedToken = new RevokedToken(tokenHash, expiry, now);
+                        revokedTokenRepository.save(revokedToken);
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to persist revoked token to database: {}", e.getMessage());
+                }
+            }
         }
     }
 
     public boolean isDenied(String token) {
         if (token == null || token.isBlank()) return false;
-        return Boolean.TRUE.equals(deniedTokens.getIfPresent(hash(token)));
+        String tokenHash = hash(token);
+
+        Boolean cached = deniedTokens.getIfPresent(tokenHash);
+        if (cached != null) {
+            return cached;
+        }
+
+        if (revokedTokenRepository != null) {
+            try {
+                boolean inDb = revokedTokenRepository.existsByTokenHashAndExpiresAtAfter(tokenHash, Instant.now());
+                deniedTokens.put(tokenHash, inDb);
+                return inDb;
+            } catch (Exception e) {
+                log.warn("Failed to check token revocation status in database: {}", e.getMessage());
+            }
+        }
+
+        return false;
+    }
+
+    @Scheduled(cron = "${app.security.jwt-denylist.cleanup-cron:0 0 * * * *}")
+    @Transactional
+    public int cleanupExpiredTokens() {
+        if (revokedTokenRepository == null) return 0;
+        try {
+            int deleted = revokedTokenRepository.deleteExpiredTokens(Instant.now());
+            if (deleted > 0) {
+                log.info("Cleaned up {} expired revoked tokens from database", deleted);
+            }
+            return deleted;
+        } catch (Exception e) {
+            log.warn("Failed to clean up expired revoked tokens: {}", e.getMessage());
+            return 0;
+        }
     }
 
     private String hash(String token) {

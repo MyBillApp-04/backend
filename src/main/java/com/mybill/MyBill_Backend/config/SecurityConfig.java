@@ -33,11 +33,6 @@ public class SecurityConfig {
             "https://mybill-app-04.web.app"
     );
 
-    private static final List<String> RENDER_ORIGIN_PATTERNS = List.of(
-            "https://*.onrender.com",
-            "http://*.onrender.com"
-    );
-
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final RateLimitFilter rateLimitFilter;
     private final Environment environment;
@@ -158,7 +153,6 @@ public class SecurityConfig {
                         .toList());
             }
             addFirebaseHostingOrigins(origins);
-            addRenderOrigins(origins);
             addPublicBaseUrlOrigin(origins);
 
             if (origins.stream().anyMatch(origin -> origin.contains("*"))) {
@@ -206,10 +200,6 @@ public class SecurityConfig {
 
     private void addFirebaseHostingOrigins(List<String> origins) {
         FIREBASE_HOSTING_ORIGINS.forEach(origin -> addIfMissing(origins, origin));
-    }
-
-    private void addRenderOrigins(List<String> origins) {
-        RENDER_ORIGIN_PATTERNS.forEach(origin -> addIfMissing(origins, origin));
     }
 
     private void addPublicBaseUrlOrigin(List<String> origins) {

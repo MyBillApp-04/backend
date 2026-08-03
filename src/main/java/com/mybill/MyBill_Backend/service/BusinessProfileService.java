@@ -14,6 +14,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.regex.Pattern;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -25,12 +29,18 @@ public class BusinessProfileService {
     private static final Pattern CLOUDINARY_URL = Pattern.compile(
             "^https://res\\.cloudinary\\.com/[A-Za-z0-9_-]+/image/upload/.+"
     );
+    private static final Set<String> CLOUDINARY_IMAGE_FORMATS = Set.of("png", "jpg", "jpeg", "webp");
+    private static final long MAX_CLOUDINARY_IMAGE_BYTES = 5 * 1024 * 1024;
+    private static final int MAX_CLOUDINARY_IMAGE_DIMENSION = 4096;
 
     private final BusinessProfileRepository repository;
     private final SecurityUtils securityUtils;
 
     @Value("${app.cloudinary.cloud-name:}")
     private String cloudinaryCloudName;
+
+    @Value("${app.cloudinary.api-secret:}")
+    private String cloudinaryApiSecret;
 
     @Cacheable(value = "businessProfiles", key = "@securityUtils.getCurrentUserId()")
     public BusinessProfile getProfile() {
@@ -106,7 +116,7 @@ public class BusinessProfileService {
     private BusinessProfile updateImagePath(ImageMetadata metadata, ImageField field) {
         Long userId = securityUtils.getCurrentUserId();
         User user = securityUtils.getCurrentUser();
-        ImageMetadata cleanMetadata = cleanImageMetadata(metadata);
+        ImageMetadata cleanMetadata = cleanImageMetadata(metadata, field);
 
         BusinessProfile profile = repository.findByUserId(userId).orElseGet(() -> {
             BusinessProfile p = new BusinessProfile();
@@ -198,7 +208,7 @@ public class BusinessProfileService {
         return cleanValue;
     }
 
-    private ImageMetadata cleanImageMetadata(ImageMetadata metadata) {
+    private ImageMetadata cleanImageMetadata(ImageMetadata metadata, ImageField field) {
         if (metadata == null) {
             return ImageMetadata.legacy(null);
         }
@@ -215,6 +225,9 @@ public class BusinessProfileService {
             if (!publicId.startsWith(expectedPrefix)) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied: Cloudinary resource folder mismatch");
             }
+            if (!publicId.startsWith(expectedPrefix + field.name().toLowerCase() + "_")) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied: Cloudinary asset type mismatch");
+            }
             String encodedPublicId = publicId.replace("/", "%2F");
             if (!secureUrl.contains(publicId) && !secureUrl.contains(encodedPublicId)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cloudinary secureUrl does not match publicId");
@@ -228,7 +241,21 @@ public class BusinessProfileService {
         if (resourceType != null && !"image".equals(resourceType)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only Cloudinary image resources are supported");
         }
-        return new ImageMetadata(secureUrl, publicId, resourceType, metadata.width(), metadata.height(), format);
+        if (secureUrl != null && (metadata.bytes() == null || metadata.bytes() < 1 || metadata.bytes() > MAX_CLOUDINARY_IMAGE_BYTES
+                || metadata.width() == null || metadata.height() == null || metadata.width() > MAX_CLOUDINARY_IMAGE_DIMENSION || metadata.height() > MAX_CLOUDINARY_IMAGE_DIMENSION
+                || format == null || !CLOUDINARY_IMAGE_FORMATS.contains(format.toLowerCase())
+                || metadata.version() == null || metadata.version() < 1 || !validCloudinarySignature(publicId, metadata.version(), metadata.signature()))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cloudinary asset metadata verification failed");
+        }
+        return new ImageMetadata(secureUrl, publicId, resourceType, metadata.width(), metadata.height(), format, metadata.bytes(), metadata.version(), metadata.signature());
+    }
+
+    private boolean validCloudinarySignature(String publicId, Long version, String signature) {
+        if (cloudinaryApiSecret == null || cloudinaryApiSecret.isBlank() || signature == null || !signature.matches("[0-9a-fA-F]{40}")) return false;
+        try {
+            byte[] bytes = MessageDigest.getInstance("SHA-1").digest(("public_id=" + publicId + "&version=" + version + cloudinaryApiSecret.trim()).getBytes(StandardCharsets.UTF_8));
+            return MessageDigest.isEqual(HexFormat.of().formatHex(bytes).getBytes(StandardCharsets.US_ASCII), signature.toLowerCase().getBytes(StandardCharsets.US_ASCII));
+        } catch (Exception e) { return false; }
     }
 
     private String required(String value, String fallback) {
@@ -248,10 +275,13 @@ public class BusinessProfileService {
             String resourceType,
             Integer width,
             Integer height,
-            String format
+            String format,
+            Long bytes,
+            Long version,
+            String signature
     ) {
         static ImageMetadata legacy(String path) {
-            return new ImageMetadata(path, null, null, null, null, null);
+            return new ImageMetadata(path, null, null, null, null, null, null, null, null);
         }
     }
 }

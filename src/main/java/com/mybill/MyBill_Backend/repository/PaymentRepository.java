@@ -21,6 +21,6 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
     List<Payment> findByClientIdAndUserIdAndIsDeletedFalseOrderByDateDesc(UUID clientId, Long userId);
 
     Optional<Payment> findByPaymentIdAndUserIdAndIsDeletedFalse(UUID paymentId, Long userId);
-    Optional<Payment> findByStripePaymentIntentIdAndIsDeletedFalse(String stripePaymentIntentId);
-    Optional<Payment> findByStripePaymentIntentIdAndUserIdAndIsDeletedFalse(String stripePaymentIntentId, Long userId);
+
+    long countByUserIdAndDateAfterAndIsDeletedFalse(Long userId, java.time.LocalDateTime since);
 }

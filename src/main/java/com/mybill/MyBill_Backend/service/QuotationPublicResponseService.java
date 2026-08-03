@@ -42,7 +42,7 @@ public class QuotationPublicResponseService {
     }
 
     public static String hashToken(String rawToken) {
-        if (rawToken == null || rawToken.isBlank()) {
+        if (rawToken == null || !rawToken.matches("^[A-Za-z0-9_-]{43}$")) {
             return null;
         }
         try {
@@ -107,7 +107,7 @@ public class QuotationPublicResponseService {
             return PublicQuotationView.invalid("Invalid link token format.");
         }
 
-        Optional<Quotation> optQuote = resolveQuotationByTokenOrId(rawToken, tokenHash);
+        Optional<Quotation> optQuote = quotationRepository.findByPublicTokenHash(tokenHash);
         if (optQuote.isEmpty()) {
             return PublicQuotationView.invalid("Quotation link not found or invalid.");
         }
@@ -152,7 +152,7 @@ public class QuotationPublicResponseService {
             return ResponseSubmissionResult.failure("Invalid link token.");
         }
 
-        Optional<Quotation> optQuote = resolveQuotationByTokenOrId(rawToken, tokenHash);
+        Optional<Quotation> optQuote = quotationRepository.findByPublicTokenHash(tokenHash);
         if (optQuote.isEmpty()) {
             return ResponseSubmissionResult.failure("Quotation not found.");
         }
@@ -250,47 +250,6 @@ public class QuotationPublicResponseService {
         }
         String trimmed = url.trim();
         return trimmed.endsWith("/") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
-    }
-
-    private Optional<Quotation> resolveQuotationByTokenOrId(String rawToken, String tokenHash) {
-        Optional<Quotation> opt = quotationRepository.findByPublicTokenHash(tokenHash);
-        if (opt.isPresent()) {
-            return opt;
-        }
-
-        try {
-            UUID id = parseUuidOrHex(rawToken);
-            if (id != null) {
-                Optional<Quotation> found = quotationRepository.findById(id);
-                if (found.isPresent()) {
-                    Quotation q = found.get();
-                    if (q.getPublicTokenHash() == null) {
-                        q.setPublicTokenHash(tokenHash);
-                        q.setTokenCreatedAt(LocalDateTime.now());
-                        q.setTokenExpiresAt(q.getValidUntilDate() != null ? q.getValidUntilDate() : LocalDateTime.now().plusDays(DEFAULT_EXPIRY_DAYS));
-                        quotationRepository.save(q);
-                    }
-                    return found;
-                }
-            }
-        } catch (Exception ignored) {}
-
-        return Optional.empty();
-    }
-
-    private UUID parseUuidOrHex(String rawToken) {
-        if (rawToken == null || rawToken.isBlank()) return null;
-        String trimmed = rawToken.trim();
-        try {
-            return UUID.fromString(trimmed);
-        } catch (Exception e) {
-            String cleanHex = trimmed.replaceAll("[^a-fA-F0-9]", "");
-            if (cleanHex.length() == 32) {
-                String uuidStr = cleanHex.replaceFirst("(\\w{8})(\\w{4})(\\w{4})(\\w{4})(\\w{12})", "$1-$2-$3-$4-$5");
-                return UUID.fromString(uuidStr);
-            }
-        }
-        return null;
     }
 
     public record PublicLinkResult(String token, String fullUrl, LocalDateTime expiresAt) {}

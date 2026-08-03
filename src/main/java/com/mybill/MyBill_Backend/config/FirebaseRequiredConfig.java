@@ -16,7 +16,6 @@ public class FirebaseRequiredConfig {
             }
 
             String firebaseConfigJson = firstNonBlank(
-                    System.getenv("FIREBASE_CONFIG_JSON"),
                     environment.getProperty("firebase.config.json"),
                     environment.getProperty("FIREBASE_CONFIG_JSON")
             );

@@ -1,0 +1,167 @@
+groups:
+  - name: mybill.payments
+    interval: 1m
+    rules:
+      - alert: HighPaymentFailureRate
+        expr: |
+          rate(mybill_payments_failures_total[5m]) /
+          (rate(mybill_payments_received_total[5m]) + rate(mybill_payments_failures_total[5m]) + 0.001) > 0.10
+        for: 3m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High payment failure rate ({{ $labels.instance }})"
+          description: >
+            Payment failure rate is {{ $value | humanizePercentage }} over the last 5 minutes.
+            Threshold is 10%. Check ClientFinancialService and database connectivity.
+
+      - alert: NoPaymentsReceived
+        expr: rate(mybill_payments_received_total[30m]) == 0
+        for: 30m
+        labels:
+          severity: info
+          team: backend
+        annotations:
+          summary: "No payments received in the last 30 minutes ({{ $labels.instance }})"
+          description: >
+            Zero payments have been processed in the last 30 minutes.
+            This may be expected during off-peak hours, or may indicate a service disruption.
+
+      - alert: FraudulentPaymentSpikeDetected
+        expr: rate(mybill_fraud_fraudulent_total{severity="fraudulent"}[10m]) > 0.5
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Fraudulent payment spike detected ({{ $labels.instance }})"
+          description: >
+            More than 0.5 fraudulent payments per second are being flagged. 
+            Review FraudDetectionService and payment source patterns.
+
+      - alert: FraudFlaggedSpikeDetected
+        expr: rate(mybill_fraud_flagged_total{severity="flagged"}[10m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Elevated fraud-flagged rate detected ({{ $labels.instance }})"
+          description: >
+            More than 2 fraud-flagged (suspicious or above) payments per second in the last 10 minutes.
+            Consider investigating user accounts with high-velocity activity.
+
+  - name: mybill.authentication
+    interval: 1m
+    rules:
+      - alert: HighAuthFailureRate
+        expr: |
+          rate(mybill_auth_failure_total[5m]) /
+          (rate(mybill_auth_success_total[5m]) + rate(mybill_auth_failure_total[5m]) + 0.001) > 0.25
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "High authentication failure rate ({{ $labels.instance }})"
+          description: >
+            Authentication failure rate is {{ $value | humanizePercentage }} over the last 5 minutes.
+            Threshold is 25%. Possible brute-force or credential stuffing attack in progress.
+
+      - alert: AuthFailureSpikeDetected
+        expr: rate(mybill_auth_failure_total[2m]) > 5
+        for: 2m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "Auth failure spike detected — possible brute-force attack ({{ $labels.instance }})"
+          description: >
+            More than 5 authentication failures per second sustained for over 2 minutes.
+            Check rate limiting configuration and review source IP addresses.
+
+  - name: mybill.service_health
+    interval: 30s
+    rules:
+      - alert: ServiceDown
+        expr: up{job="mybill-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "MyBill backend service is DOWN ({{ $labels.instance }})"
+          description: >
+            The MyBill backend Prometheus scrape target has been unreachable for 1 minute.
+            Immediately check container health, deployment status, and render.com logs.
+
+      - alert: HighResponseLatency
+        expr: |
+          histogram_quantile(0.95,
+            rate(http_server_requests_seconds_bucket{job="mybill-backend"}[5m])
+          ) > 2.0
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High API response latency ({{ $labels.instance }})"
+          description: >
+            95th percentile response latency is above 2 seconds for the last 5 minutes.
+            Current value: {{ $value | humanizeDuration }}. Check database query performance and connection pool saturation.
+
+      - alert: DatabaseHealthDown
+        expr: spring_boot_actuator_health_status{health="database"} != 1
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Database health check is failing ({{ $labels.instance }})"
+          description: >
+            The MyBill backend database health indicator has been DOWN for 2 minutes.
+            Check PostgreSQL connectivity and HikariCP pool exhaustion.
+
+      - alert: HighJvmHeapUsage
+        expr: |
+          jvm_memory_used_bytes{area="heap"} /
+          jvm_memory_max_bytes{area="heap"} > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "JVM heap usage is critically high ({{ $labels.instance }})"
+          description: >
+            JVM heap utilization is at {{ $value | humanizePercentage }} (threshold: 85%).
+            Risk of OutOfMemoryError. Consider increasing heap allocation or reviewing for memory leaks.
+
+      - alert: HikariConnectionPoolExhausted
+        expr: |
+          hikaricp_connections_pending{pool="HikariPool-1"} > 5
+        for: 2m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "HikariCP connection pool has pending threads ({{ $labels.instance }})"
+          description: >
+            {{ $value }} threads are waiting for a database connection from the pool.
+            Consider increasing spring.datasource.hikari.maximum-pool-size.
+
+  - name: mybill.invoices
+    interval: 2m
+    rules:
+      - alert: InvoiceGenerationDrop
+        expr: |
+          rate(mybill_invoices_generated_total[1h]) == 0
+        for: 2h
+        labels:
+          severity: info
+          team: backend
+        annotations:
+          summary: "No invoices generated in the last 2 hours ({{ $labels.instance }})"
+          description: >
+            Zero invoices have been generated in 2 hours during business hours.
+            This may indicate a service disruption or is expected outside business hours.

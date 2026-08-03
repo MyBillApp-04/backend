@@ -7,12 +7,10 @@ import com.mybill.MyBill_Backend.observability.SecureLogMessageConverter;
 import com.mybill.MyBill_Backend.repository.AsyncJobRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -22,7 +20,6 @@ public class AsyncJobService {
 
     private final AsyncJobRepository asyncJobRepository;
     private final ObjectMapper objectMapper;
-    private final ApplicationContext applicationContext;
 
     @Transactional
     public AsyncJob enqueue(String jobType, Object payload, User user, UUID invoiceId) {
@@ -54,9 +51,8 @@ public class AsyncJobService {
         try {
             log.info("Starting execution of async job: ID={}, Type={}", job.getJobId(), job.getJobType());
 
-            switch (job.getJobType()) {
-                case "STRIPE_PAYMENT" -> executeStripePaymentJob(job);
-                default -> throw new IllegalArgumentException("Unknown job type: " + job.getJobType());
+            if (job.getJobType() != null) {
+                throw new IllegalArgumentException("Unknown job type: " + job.getJobType());
             }
 
             job.setStatus("COMPLETED");
@@ -80,15 +76,5 @@ public class AsyncJobService {
             }
         }
         asyncJobRepository.save(job);
-    }
-
-    private void executeStripePaymentJob(AsyncJob job) throws Exception {
-        StripeService stripeService = applicationContext.getBean(StripeService.class);
-        Map<?, ?> map = objectMapper.readValue(job.getPayload(), Map.class);
-
-        String paymentIntentId = (String) map.get("paymentIntentId");
-        Double amount = (Double) map.get("amount");
-
-        stripeService.processPayment(paymentIntentId, amount);
     }
 }

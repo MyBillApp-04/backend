@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,6 +23,7 @@ public class PaymentSheetRequest {
     private UUID invoiceId;
 
     @NotBlank(message = "Invoice number is required")
+    @Size(max = 100, message = "Invoice number must be 100 characters or fewer")
     private String invoiceNumber;
 
     @NotNull(message = "Amount is required")
@@ -33,5 +35,6 @@ public class PaymentSheetRequest {
     private String currency;
 
     @NotBlank(message = "Client name is required")
+    @Size(max = 200, message = "Client name must be 200 characters or fewer")
     private String clientName;
 }

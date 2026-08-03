@@ -63,7 +63,10 @@ public class BusinessProfileController {
                         request.resourceType(),
                         request.width(),
                         request.height(),
-                        request.format()
+                        request.format(),
+                        request.bytes(),
+                        request.version(),
+                        request.signature()
                 ),
                 field
         );
@@ -99,7 +102,16 @@ public class BusinessProfileController {
 
             @NotBlank(message = "format is required")
             @Size(max = 50, message = "format is too long")
-            String format
+            String format,
+
+            @NotNull @Min(1) @Max(5242880)
+            Long bytes,
+
+            @NotNull @Min(1)
+            Long version,
+
+            @NotBlank @Pattern(regexp = "^[0-9a-fA-F]{40}$")
+            String signature
     ) {
     }
 }

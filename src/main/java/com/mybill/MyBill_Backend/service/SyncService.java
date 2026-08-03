@@ -1058,6 +1058,23 @@ public class SyncService {
 
         quotation.setDeviceId(valueOrDefault(payload.getDeviceId(), deviceId));
 
+        String rawToken = payload.getPublicToken();
+        if (rawToken != null && rawToken.matches("^[A-Za-z0-9_-]{43}$")) {
+            String tokenHash = QuotationPublicResponseService.hashToken(rawToken);
+            quotation.setPublicTokenHash(tokenHash);
+            if (quotation.getTokenCreatedAt() == null) {
+                quotation.setTokenCreatedAt(serverTime);
+            }
+            if (quotation.getTokenExpiresAt() == null) {
+                quotation.setTokenExpiresAt(payload.getValidUntilDate() != null ? payload.getValidUntilDate() : serverTime.plusDays(30));
+            }
+        } else if (quotation.getPublicTokenHash() == null) {
+            String generatedToken = QuotationPublicResponseService.generateRandomToken();
+            quotation.setPublicTokenHash(QuotationPublicResponseService.hashToken(generatedToken));
+            quotation.setTokenCreatedAt(serverTime);
+            quotation.setTokenExpiresAt(payload.getValidUntilDate() != null ? payload.getValidUntilDate() : serverTime.plusDays(30));
+        }
+
         if (quotation.getCreatedAt() == null) {
             quotation.setCreatedAt(serverTime);
         }

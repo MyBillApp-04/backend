@@ -20,6 +20,12 @@ public class AuthService {
 
     @Transactional
     public String firebaseLogin(String email, String name, AuthProvider provider, Role role) {
+        User user = firebaseLoginUser(email, name, provider, role);
+        return jwtUtil.generateToken(user.getEmail(), user.getRole());
+    }
+
+    @Transactional
+    public User firebaseLoginUser(String email, String name, AuthProvider provider, Role role) {
         Optional<User> existing = userRepository.findByEmail(email);
 
         User user;
@@ -50,6 +56,6 @@ public class AuthService {
             user = userRepository.save(user);
         }
 
-        return jwtUtil.generateToken(user.getEmail(), user.getRole());
+        return user;
     }
 }

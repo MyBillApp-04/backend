@@ -422,10 +422,13 @@ public class GlobalExceptionHandler {
 
         logException(status, path, userIdStr, invoiceIdStr, message, ex);
 
+        String category = resolveErrorCategory(status, ex);
+
         Map<String, Object> body = new HashMap<>();
         body.put("timestamp", LocalDateTime.now());
         body.put("status", status.value());
         body.put("error", status.getReasonPhrase());
+        body.put("category", category);
         body.put("message", message);
         body.put("path", path);
         body.put("requestId", currentRequestId());
@@ -433,6 +436,25 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(body);
+    }
+
+    private String resolveErrorCategory(HttpStatus status, Throwable ex) {
+        if (status == HttpStatus.UNAUTHORIZED || status == HttpStatus.FORBIDDEN) {
+            return "SECURITY_DENIED";
+        }
+        if (status == HttpStatus.NOT_FOUND) {
+            return "RESOURCE_NOT_FOUND";
+        }
+        if (status == HttpStatus.BAD_REQUEST || ex instanceof ConstraintViolationException || ex instanceof MethodArgumentNotValidException) {
+            return "VALIDATION_ERROR";
+        }
+        if (status == HttpStatus.CONFLICT) {
+            return "RESOURCE_CONFLICT";
+        }
+        if (ex instanceof DataAccessException || ex instanceof DataIntegrityViolationException) {
+            return "DATABASE_ERROR";
+        }
+        return status.is5xxServerError() ? "SYSTEM_ERROR" : "CLIENT_ERROR";
     }
 
     private void logException(
@@ -443,19 +465,21 @@ public class GlobalExceptionHandler {
             String message,
             Throwable ex
     ) {
+        String category = resolveErrorCategory(status, ex);
         if (status.is5xxServerError()) {
-            log.error("api_error status={} path={} userId={} resourceId={} exception={} message={} requestId={}",
-                    status.value(), path, userId, resourceId,
+            log.error("api_error severity=CRITICAL category={} status={} path={} userId={} resourceId={} exception={} message={} requestId={}",
+                    category, status.value(), path, userId, resourceId,
                     ex != null ? ex.getClass().getSimpleName() : "None",
                     SecureLogMessageConverter.sanitize(message),
-                    currentRequestId());
+                    currentRequestId(), ex);
             return;
         }
 
-        log.warn("api_error status={} path={} userId={} resourceId={} exception={} message={}",
-                status.value(), path, userId, resourceId,
+        log.warn("api_error severity=WARN category={} status={} path={} userId={} resourceId={} exception={} message={} requestId={}",
+                category, status.value(), path, userId, resourceId,
                 ex != null ? ex.getClass().getSimpleName() : "None",
-                SecureLogMessageConverter.sanitize(message));
+                SecureLogMessageConverter.sanitize(message),
+                currentRequestId());
     }
 
     private String safeMessage(Throwable ex) {

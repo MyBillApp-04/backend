@@ -89,11 +89,6 @@ class InvoiceApiIT {
 
     @BeforeEach
     void setUp() {
-        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
-        jdbc.execute("ALTER TABLE customer_notification_templates ALTER COLUMN is_deleted SET DEFAULT false");
-        jdbc.execute("ALTER TABLE customer_notification_templates ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP");
-        jdbc.execute("ALTER TABLE customer_notification_templates ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP");
-
         // Run Flyway manually on the Hibernate-created schema to setup sequences and helper tables
         flyway = Flyway.configure()
                 .dataSource(dataSource)
@@ -102,6 +97,14 @@ class InvoiceApiIT {
                 .validateOnMigrate(false)
                 .load();
         flyway.migrate();
+
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        try {
+            jdbc.execute("ALTER TABLE customer_notification_templates ALTER COLUMN is_deleted SET DEFAULT false");
+            jdbc.execute("ALTER TABLE customer_notification_templates ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP");
+            jdbc.execute("ALTER TABLE customer_notification_templates ALTER COLUMN updated_at SET DEFAULT CURRENT_TIMESTAMP");
+        } catch (Exception ignored) {
+        }
 
         // Bypass rate limits in test environments to prevent 429 errors
         ReflectionTestUtils.setField(rateLimitFilter, "authLimitPerMinute", 1000);
