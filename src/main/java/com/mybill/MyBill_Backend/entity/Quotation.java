@@ -103,6 +103,12 @@ public class Quotation {
     @Column(name = "public_token_hash", length = 64)
     private String publicTokenHash;
 
+    /** Raw URL-safe base64 token (43 chars). Stored alongside the hash so the
+     *  sync pull endpoint can echo it back to clients for link reconstruction.
+     *  Never used for authentication lookups — only the hash is used for that. */
+    @Column(name = "public_token", length = 43)
+    private String publicToken;
+
     @Column(name = "token_created_at")
     private LocalDateTime tokenCreatedAt;
 

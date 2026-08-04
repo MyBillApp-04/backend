@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.*;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -47,6 +48,10 @@ public class SyncService {
     private final QuotationRepository quotationRepository;
     private final QuotationItemRepository quotationItemRepository;
     private final QuotationService quotationService;
+
+    /** Canonical public base URL — used when building quotation share links in sync pull responses. */
+    @Value("${app.public-url.base-url:https://mybill-backend-vckc.onrender.com}")
+    private String publicBaseUrl;
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @CacheEvict(value = "dashboardStats", allEntries = true)
@@ -1062,6 +1067,7 @@ public class SyncService {
         if (rawToken != null && rawToken.matches("^[A-Za-z0-9_-]{43}$")) {
             String tokenHash = QuotationPublicResponseService.hashToken(rawToken);
             quotation.setPublicTokenHash(tokenHash);
+            quotation.setPublicToken(rawToken); // persist raw token so sync pull can echo it back
             if (quotation.getTokenCreatedAt() == null) {
                 quotation.setTokenCreatedAt(serverTime);
             }
@@ -1071,6 +1077,7 @@ public class SyncService {
         } else if (quotation.getPublicTokenHash() == null) {
             String generatedToken = QuotationPublicResponseService.generateRandomToken();
             quotation.setPublicTokenHash(QuotationPublicResponseService.hashToken(generatedToken));
+            quotation.setPublicToken(generatedToken); // persist raw token for sync pull echo-back
             quotation.setTokenCreatedAt(serverTime);
             quotation.setTokenExpiresAt(payload.getValidUntilDate() != null ? payload.getValidUntilDate() : serverTime.plusDays(30));
         }
@@ -1172,6 +1179,18 @@ public class SyncService {
         m.put("isDeleted", q.getIsDeleted());
         m.put("deviceId", q.getDeviceId());
         m.put("version", q.getVersion());
+        // Echo the raw token and the canonical public URL back to the client.
+        // The client must use these values — never construct the URL from a local token.
+        String rawToken = q.getPublicToken();
+        m.put("publicToken", rawToken);
+        if (rawToken != null) {
+            String base = publicBaseUrl != null && !publicBaseUrl.isBlank()
+                    ? publicBaseUrl.trim().replaceAll("/+$", "")
+                    : "https://mybill-backend-vckc.onrender.com";
+            m.put("publicResponseUrl", base + "/q/" + rawToken);
+        } else {
+            m.put("publicResponseUrl", null);
+        }
         return m;
     }
 

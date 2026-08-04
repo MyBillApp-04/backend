@@ -78,6 +78,7 @@ public class QuotationPublicResponseService {
                 : now.plusDays(DEFAULT_EXPIRY_DAYS);
 
         quotation.setPublicTokenHash(tokenHash);
+        quotation.setPublicToken(rawToken);
         quotation.setTokenCreatedAt(now);
         quotation.setTokenExpiresAt(expiresAt);
         quotation.setTokenRevokedAt(null);
