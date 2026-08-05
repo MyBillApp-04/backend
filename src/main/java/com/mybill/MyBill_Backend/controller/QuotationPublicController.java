@@ -35,7 +35,7 @@ public class QuotationPublicController {
     @PostMapping("/{token}/respond")
     public String submitResponse(
             @PathVariable("token") @Pattern(regexp = "^[A-Za-z0-9_-]{43}$") String token,
-            @RequestParam("action") @Pattern(regexp = "(?i)ACCEPT(?:ED)?|DECLINE(?:D)?|REJECTED|DISCUSS(?:ION(?:_REQUESTED)?)?") String action,
+            @RequestParam("action") @Pattern(regexp = "(?i)ACCEPT(?:ED)?|DECLINE(?:D)?|REJECTED|DISCUSS(?:ION(?:_REQUESTED)?)?|REVISE|REVISION(?:_REQUESTED)?|MODIFICATION") String action,
             @RequestParam(value = "message", required = false) @Size(max = 2000) String message,
             HttpServletRequest request,
             Model model) {

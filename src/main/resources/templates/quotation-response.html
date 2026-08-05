@@ -92,6 +92,7 @@
         .badge-accepted { background: #DCFCE7; color: #166534; }
         .badge-declined { background: #FEE2E2; color: #991B1B; }
         .badge-discussion { background: #E0F2FE; color: #075985; }
+        .badge-revision { background: #FFEDD5; color: #C2410C; }
 
         .error-box {
             background: #FEF2F2;
@@ -230,6 +231,7 @@
                     <span class="badge badge-accepted" th:if="${view.clientResponseStatus == 'ACCEPTED'}">Accepted</span>
                     <span class="badge badge-declined" th:if="${view.clientResponseStatus == 'DECLINED'}">Declined</span>
                     <span class="badge badge-discussion" th:if="${view.clientResponseStatus == 'DISCUSSION_REQUESTED'}">Discussion Requested</span>
+                    <span class="badge badge-revision" th:if="${view.clientResponseStatus == 'REVISION_REQUESTED'}">Revision Requested</span>
                 </span>
             </div>
             <div th:if="${view.discussionMessage != null && !view.discussionMessage.isBlank()}" class="info-row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
@@ -239,7 +241,7 @@
         </div>
 
         <!-- ACTION FORMS -->
-        <div th:if="${view != null && view.isValid && (view.clientResponseStatus == 'PENDING' || view.clientResponseStatus == 'DISCUSSION_REQUESTED') && successMsg == null}">
+        <div th:if="${view != null && view.isValid && (view.clientResponseStatus == 'PENDING' || view.clientResponseStatus == 'DISCUSSION_REQUESTED' || view.clientResponseStatus == 'REVISION_REQUESTED') && successMsg == null}">
             
             <form th:action="@{'/q/' + ${view.token} + '/respond'}" method="post" class="actions-form">
                 <input type="hidden" name="action" value="ACCEPT" />
@@ -253,10 +255,12 @@
 
             <div class="discuss-section">
                 <form th:action="@{'/q/' + ${view.token} + '/respond'}" method="post">
-                    <input type="hidden" name="action" value="DISCUSS" />
                     <label for="message" style="display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px;">Want to discuss details or suggest changes?</label>
                     <textarea id="message" name="message" class="textarea-field" placeholder="Enter your comments or discussion message..."></textarea>
-                    <button type="submit" class="btn btn-discuss">💬 Send Discussion Request</button>
+                    <div style="display: flex; gap: 10px; flex-direction: column;">
+                        <button type="submit" name="action" value="DISCUSS" class="btn btn-discuss">💬 Send Message/Comment</button>
+                        <button type="submit" name="action" value="REVISE" class="btn btn-discuss" style="background-color: #D97706;">🛠️ Request Modifications</button>
+                    </div>
                 </form>
             </div>
         </div>

@@ -54,19 +54,30 @@ public class FcmNotificationService {
             case "DECLINE":
             case "DECLINED":
             case "REJECTED":
-                title = "Quotation Declined";
-                body = safeClient + " declined quotation " + safeQuoteNo;
+                title = "Quotation Rejected";
+                body = safeClient + " rejected quotation " + safeQuoteNo;
                 statusStr = "REJECTED";
                 break;
             case "DISCUSS":
             case "DISCUSSION":
             case "DISCUSSION_REQUESTED":
-                title = "Discussion Requested";
-                body = safeClient + " requested discussion on quotation " + safeQuoteNo;
+                title = "New Discussion";
+                body = safeClient + " commented on quotation " + safeQuoteNo;
                 if (discussionMessage != null && !discussionMessage.isBlank()) {
                     body += ": \"" + discussionMessage.trim() + "\"";
                 }
                 statusStr = "DISCUSSION_REQUESTED";
+                break;
+            case "REVISE":
+            case "REVISION":
+            case "REVISION_REQUESTED":
+            case "MODIFICATION":
+                title = "Revision Requested";
+                body = safeClient + " requested changes for quotation " + safeQuoteNo;
+                if (discussionMessage != null && !discussionMessage.isBlank()) {
+                    body += ": \"" + discussionMessage.trim() + "\"";
+                }
+                statusStr = "REVISION_REQUESTED";
                 break;
             default:
                 title = "Quotation Update";
@@ -105,50 +116,97 @@ public class FcmNotificationService {
             return;
         }
 
-        for (UserDeviceToken deviceToken : tokens) {
-            try {
-                Message message = Message.builder()
-                        .setToken(deviceToken.getFcmToken())
-                        .setNotification(com.google.firebase.messaging.Notification.builder()
-                                .setTitle(title)
-                                .setBody(body)
-                                .build())
-                        .putData("type", "quotation_response")
-                        .putData("quotationId", quotation.getId().toString())
-                        .putData("quotationNumber", safeQuoteNo)
-                        .putData("status", statusStr)
-                        .setAndroidConfig(AndroidConfig.builder()
-                                .setPriority(AndroidConfig.Priority.HIGH)
-                                .setNotification(AndroidNotification.builder()
-                                        .setSound("default")
-                                        .setChannelId("high_importance_channel")
-                                        .setPriority(AndroidNotification.Priority.HIGH)
-                                        .setDefaultSound(true)
-                                        .setDefaultVibrateTimings(true)
-                                        .setClickAction("FLUTTER_NOTIFICATION_CLICK")
-                                        .build())
-                                .build())
-                        .setApnsConfig(ApnsConfig.builder()
-                                .setAps(Aps.builder()
-                                        .setSound("default")
-                                        .setBadge(1)
-                                        .setContentAvailable(true)
-                                        .build())
-                                .build())
-                        .build();
+        logger.info("Notification requested: quotationId={}, action={}", quotation.getId(), action);
 
-                String response = FirebaseMessaging.getInstance().send(message);
-                logger.info("Successfully sent FCM notification to user id {}, messageId={}", userId, response);
-            } catch (FirebaseMessagingException e) {
-                logger.warn("Failed to send FCM notification to token for user id {}: code={}, message={}",
-                        userId, e.getMessagingErrorCode(), e.getMessage());
-                if (e.getMessagingErrorCode() == MessagingErrorCode.UNREGISTERED
-                        || e.getMessagingErrorCode() == MessagingErrorCode.INVALID_ARGUMENT) {
-                    logger.info("Removing invalid/unregistered FCM token for user id {}", userId);
-                    deviceTokenRepository.delete(deviceToken);
+        for (UserDeviceToken deviceToken : tokens) {
+            String tokenStr = deviceToken.getFcmToken();
+            int maxAttempts = 4;
+            int attempt = 0;
+            boolean sent = false;
+            long backoffMs = 1000;
+
+            while (attempt < maxAttempts && !sent) {
+                attempt++;
+                try {
+                    Message message = Message.builder()
+                            .setToken(tokenStr)
+                            .setNotification(com.google.firebase.messaging.Notification.builder()
+                                    .setTitle(title)
+                                    .setBody(body)
+                                    .build())
+                            .putData("type", "quotation_response")
+                            .putData("quotationId", quotation.getId().toString())
+                            .putData("quotationNumber", safeQuoteNo)
+                            .putData("status", statusStr)
+                            .putData("action", statusStr)
+                            .putData("clientId", quotation.getClient() != null ? quotation.getClient().getId().toString() : "")
+                            .putData("timestamp", java.time.Instant.now().toString())
+                            .setAndroidConfig(AndroidConfig.builder()
+                                    .setPriority(AndroidConfig.Priority.HIGH)
+                                    .setNotification(AndroidNotification.builder()
+                                            .setSound("default")
+                                            .setChannelId("high_importance_channel")
+                                            .setPriority(AndroidNotification.Priority.HIGH)
+                                            .setDefaultSound(true)
+                                            .setDefaultVibrateTimings(true)
+                                            .setClickAction("FLUTTER_NOTIFICATION_CLICK")
+                                            .build())
+                                    .build())
+                            .setApnsConfig(ApnsConfig.builder()
+                                    .putHeader("apns-priority", "10")
+                                    .setAps(Aps.builder()
+                                            .setSound("default")
+                                            .setBadge(1)
+                                            .setContentAvailable(true)
+                                            .build())
+                                    .build())
+                            .build();
+
+                    logger.info("Payload built for user id {}: title=\"{}\", token={}", userId, title, tokenStr);
+
+                    String response = FirebaseMessaging.getInstance().send(message);
+                    logger.info("Firebase response: {}", response);
+                    logger.info("Success: Successfully sent FCM notification to user id {}, messageId={}", userId, response);
+                    sent = true;
+                } catch (FirebaseMessagingException e) {
+                    MessagingErrorCode errorCode = e.getMessagingErrorCode();
+                    logger.warn("Failure: Failed to send FCM notification on attempt {}/{} for user id {}: code={}, message={}",
+                            attempt, maxAttempts, userId, errorCode, e.getMessage());
+
+                    if (errorCode == MessagingErrorCode.UNREGISTERED || errorCode == MessagingErrorCode.INVALID_ARGUMENT) {
+                        logger.info("Token invalid: Removing invalid/unregistered FCM token for user id {}: {}", userId, tokenStr);
+                        deviceTokenRepository.delete(deviceToken);
+                        break;
+                    }
+
+                    if (attempt < maxAttempts) {
+                        logger.info("Retry: Retrying FCM notification send to user id {} in {}ms", userId, backoffMs);
+                        try {
+                            Thread.sleep(backoffMs);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                        backoffMs *= 2;
+                    } else {
+                        logger.error("Failure: Failed to send FCM notification to user id {} after {} attempts.", userId, maxAttempts);
+                    }
+                } catch (Exception e) {
+                    logger.error("Failure: Unexpected error sending FCM notification on attempt {}/{} for user id {}: {}",
+                            attempt, maxAttempts, userId, e.getMessage(), e);
+                    if (attempt < maxAttempts) {
+                        logger.info("Retry: Retrying FCM notification send to user id {} in {}ms due to unexpected error", userId, backoffMs);
+                        try {
+                            Thread.sleep(backoffMs);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                        backoffMs *= 2;
+                    } else {
+                        logger.error("Failure: Unexpected error sending FCM notification to user id {} after {} attempts.", userId, maxAttempts);
+                    }
                 }
-            } catch (Exception e) {
-                logger.error("Unexpected error sending FCM notification for user id {}: {}", userId, e.getMessage(), e);
             }
         }
     }

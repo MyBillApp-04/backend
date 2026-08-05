@@ -6,6 +6,8 @@ import com.mybill.MyBill_Backend.repository.UserDeviceTokenRepository;
 import com.mybill.MyBill_Backend.util.SecurityUtils;
 import com.mybill.MyBill_Backend.dto.DeviceTokenRequest;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,6 +17,8 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/device-tokens")
 public class DeviceTokenController {
+
+    private static final Logger logger = LoggerFactory.getLogger(DeviceTokenController.class);
 
     private final UserDeviceTokenRepository deviceTokenRepository;
     private final SecurityUtils securityUtils;
@@ -50,6 +54,7 @@ public class DeviceTokenController {
         }
 
         deviceTokenRepository.save(tokenEntity);
+        logger.info("Token stored: userId={}, platform={}, token={}", user.getId(), platform, fcmToken.trim());
         return ResponseEntity.ok(Map.of("message", "Device token registered successfully"));
     }
 

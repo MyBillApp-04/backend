@@ -18,9 +18,13 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class QuotationPublicResponseService {
+
+    private static final Logger logger = LoggerFactory.getLogger(QuotationPublicResponseService.class);
 
     private static final SecureRandom secureRandom = new SecureRandom();
     private static final int DEFAULT_EXPIRY_DAYS = 30;
@@ -202,6 +206,15 @@ public class QuotationPublicResponseService {
                 updateMainStatus = true;
                 newMainStatus = QuotationStatus.DISCUSSION_REQUESTED;
                 break;
+            case "REVISE":
+            case "REVISION":
+            case "REVISION_REQUESTED":
+            case "MODIFICATION":
+                normalizedAction = "REVISION_REQUESTED";
+                clientResponseStatus = "REVISION_REQUESTED";
+                updateMainStatus = true;
+                newMainStatus = QuotationStatus.DISCUSSION_REQUESTED;
+                break;
             default:
                 return ResponseSubmissionResult.failure("Unsupported response action: " + actionInput);
         }
@@ -220,7 +233,8 @@ public class QuotationPublicResponseService {
         if (updateMainStatus && newMainStatus != null) {
             q.setStatus(newMainStatus);
         }
-        if ("DISCUSSION_REQUESTED".equals(clientResponseStatus) && message != null && !message.isBlank()) {
+        if (("DISCUSSION_REQUESTED".equals(clientResponseStatus) || "REVISION_REQUESTED".equals(clientResponseStatus)) 
+                && message != null && !message.isBlank()) {
             q.setDiscussionMessage(message.trim());
         }
         quotationRepository.save(q);
@@ -237,6 +251,17 @@ public class QuotationPublicResponseService {
                 .createdAt(now)
                 .build();
         responseEventRepository.save(auditEvent);
+
+        // Log quotation events
+        if ("ACCEPTED".equals(normalizedAction)) {
+            logger.info("Quotation accepted: ID={}", q.getId());
+        } else if ("DECLINED".equals(normalizedAction)) {
+            logger.info("Quotation rejected: ID={}", q.getId());
+        } else if ("DISCUSSION_REQUESTED".equals(normalizedAction)) {
+            logger.info("Quotation discussion: ID={}", q.getId());
+        } else if ("REVISION_REQUESTED".equals(normalizedAction)) {
+            logger.info("Quotation revision: ID={}", q.getId());
+        }
 
         // Dispatch FCM Notification to owner asynchronously
         String clientName = (q.getClient() != null && q.getClient().getName() != null) ? q.getClient().getName() : "Customer";

@@ -155,6 +155,25 @@ class QuotationPublicResponseServiceTest {
     }
 
     @Test
+    @DisplayName("processClientResponse REVISE updates status to DISCUSSION_REQUESTED and clientResponseStatus to REVISION_REQUESTED")
+    void testProcessClientResponseRevise() {
+        when(quotationRepository.findByPublicTokenHash(tokenHash)).thenReturn(Optional.of(sampleQuotation));
+
+        QuotationPublicResponseService.ResponseSubmissionResult result =
+                publicResponseService.processClientResponse(rawToken, "REVISE", "Please change quantity to 10", "127.0.0.1", "TestAgent");
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.status()).isEqualTo("REVISION_REQUESTED");
+        assertThat(sampleQuotation.getStatus()).isEqualTo(QuotationStatus.DISCUSSION_REQUESTED);
+        assertThat(sampleQuotation.getClientResponseStatus()).isEqualTo("REVISION_REQUESTED");
+        assertThat(sampleQuotation.getDiscussionMessage()).isEqualTo("Please change quantity to 10");
+
+        verify(quotationRepository).save(sampleQuotation);
+        verify(responseEventRepository).save(any(QuotationResponseEvent.class));
+        verify(fcmNotificationService).sendQuotationResponseNotification(eq(sampleQuotation), eq("REVISION_REQUESTED"), eq("Valued Client"), eq("Please change quantity to 10"));
+    }
+
+    @Test
     @DisplayName("A quotation UUID cannot be used as a public capability token")
     void rejectsRawQuotationUuidWithoutLookingItUp() {
         QuotationPublicResponseService.PublicQuotationView view =
