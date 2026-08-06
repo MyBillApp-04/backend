@@ -1,5 +1,6 @@
 package com.mybill.MyBill_Backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.annotation.CreatedBy;
@@ -103,6 +104,7 @@ public class Invoice {
 
     private String deviceId;
 
+    @Version
     @Builder.Default
     @Column(nullable = false)
     private Integer version = 1;
@@ -115,6 +117,7 @@ public class Invoice {
     @Column(name = "updated_by")
     private Long updatedBy;
 
+    @JsonIgnore
     @Builder.Default
     @OneToMany(mappedBy = "invoice")
     private List<InvoiceItem> items = new ArrayList<>();

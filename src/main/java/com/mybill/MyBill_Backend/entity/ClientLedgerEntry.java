@@ -77,6 +77,7 @@ public class ClientLedgerEntry {
 
     private String deviceId;
 
+    @Version
     @Builder.Default
     @Column(nullable = false)
     private Integer version = 1;

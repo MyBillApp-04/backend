@@ -38,20 +38,44 @@ class RefreshTokenServiceTest {
     }
 
     @Test
-    void rotatesAnActiveRefreshTokenAndRejectsReuse() {
+    void rotatesAnActiveRefreshToken() {
         User user = User.builder().email("owner@example.com").role(Role.OWNER).build();
         RefreshToken existing = new RefreshToken();
         existing.setUser(user);
         existing.setExpiresAt(Instant.now().plusSeconds(60));
-        when(repository.findByTokenHashAndRevokedAtIsNull(any())).thenReturn(Optional.of(existing));
+        when(repository.findByTokenHash(any())).thenReturn(Optional.of(existing));
         when(jwtUtil.generateToken(user.getEmail(), user.getRole())).thenReturn("access-token");
         ReflectionTestUtils.setField(service, "refreshExpirationMillis", 60_000L);
 
         service.rotate("valid_refresh_token");
 
         assertThat(existing.getRevokedAt()).isNotNull();
-        when(repository.findByTokenHashAndRevokedAtIsNull(any())).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> service.rotate("valid_refresh_token"))
+    }
+
+    @Test
+    void rejectsExpiredRefreshToken() {
+        User user = User.builder().email("owner@example.com").role(Role.OWNER).build();
+        RefreshToken existing = new RefreshToken();
+        existing.setUser(user);
+        existing.setExpiresAt(Instant.now().minusSeconds(10));
+        when(repository.findByTokenHash(any())).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> service.rotate("expired_refresh_token"))
                 .isInstanceOf(RefreshTokenService.InvalidRefreshTokenException.class);
+    }
+
+    @Test
+    void detectsTokenReuseAndRevokesAllTokens() {
+        User user = User.builder().email("owner@example.com").role(Role.OWNER).build();
+        RefreshToken existing = new RefreshToken();
+        existing.setUser(user);
+        existing.setExpiresAt(Instant.now().plusSeconds(60));
+        existing.setRevokedAt(Instant.now().minusSeconds(5));
+        when(repository.findByTokenHash(any())).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> service.rotate("reused_refresh_token"))
+                .isInstanceOf(RefreshTokenService.InvalidRefreshTokenException.class);
+
+        verify(repository).revokeAllByUser(eq(user), any(Instant.class));
     }
 }

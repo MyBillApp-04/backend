@@ -33,4 +33,12 @@ public class RefreshToken {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    /** Stable device identifier (UUID generated on first install). */
+    @Column(name = "device_id", length = 128)
+    private String deviceId;
+
+    /** Human-readable device name (e.g. "Samsung Galaxy S24"). */
+    @Column(name = "device_name", length = 255)
+    private String deviceName;
 }

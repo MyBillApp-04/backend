@@ -88,10 +88,15 @@ public class SecurityConfig {
                         .contentSecurityPolicy(csp -> csp
                                 .policyDirectives("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'"))
                         .frameOptions(frame -> frame.deny())
-                        .httpStrictTransportSecurity(hsts -> hsts
-                                .includeSubDomains(true)
-                                .preload(true)
-                                .maxAgeInSeconds(31536000))
+                        .httpStrictTransportSecurity(hsts -> {
+                            if (requireHttps) {
+                                hsts.includeSubDomains(true)
+                                    .preload(true)
+                                    .maxAgeInSeconds(31536000);
+                            } else {
+                                hsts.disable();
+                            }
+                        })
                         .contentTypeOptions(contentType -> {})
                         .referrerPolicy(referrer -> referrer
                                 .policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))

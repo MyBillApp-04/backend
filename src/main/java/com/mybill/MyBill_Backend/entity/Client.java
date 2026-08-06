@@ -44,6 +44,7 @@ public class Client {
 
     private String deviceId;
 
+    @Version
     @Builder.Default
     @Column(nullable = false)
     private Integer version = 1;

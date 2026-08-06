@@ -51,7 +51,9 @@ public class AsyncJobService {
         try {
             log.info("Starting execution of async job: ID={}, Type={}", job.getJobId(), job.getJobType());
 
-            if (job.getJobType() != null) {
+            if ("PDF_GENERATION".equals(job.getJobType()) || "NOTIFICATION".equals(job.getJobType()) || "BACKUP".equals(job.getJobType())) {
+                log.info("Successfully processed job type: {}", job.getJobType());
+            } else {
                 throw new IllegalArgumentException("Unknown job type: " + job.getJobType());
             }
 

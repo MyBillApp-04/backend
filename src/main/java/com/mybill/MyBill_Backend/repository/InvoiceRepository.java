@@ -6,6 +6,8 @@ import com.mybill.MyBill_Backend.entity.PaymentStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,14 +21,20 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
     Optional<Invoice> findByIdAndUserId(UUID id, Long userId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM Invoice i WHERE i.id = :id AND i.user.id = :userId")
+    Optional<Invoice> findByIdAndUserIdWithLock(@Param("id") UUID id, @Param("userId") Long userId);
+
     Optional<Invoice> findByInvoiceNumberAndUserId(String invoiceNumber, Long userId);
 
+    @EntityGraph(attributePaths = {"client"})
     List<Invoice> findByClientIdAndUserIdAndIsDeletedFalse(UUID clientId, Long userId);
 
     Page<InvoiceProjection> findProjectedByClientIdAndUserIdAndIsDeletedFalse(UUID clientId, Long userId, Pageable pageable);
 
     Page<InvoiceProjection> findProjectedByUserIdAndIsDeletedFalse(Long userId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"client"})
     Page<Invoice> findByUserIdAndIsDeletedFalse(Long userId, Pageable pageable);
 
     List<Invoice> findTop50ByIsDeletedFalseAndPaymentStatusNotAndDueDateLessThanEqualOrderByDueDateAsc(
@@ -294,6 +302,8 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
             @Param("userId") Long userId
     );
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"client"})
     @Query("""
            SELECT i FROM Invoice i
            WHERE i.client.id = :clientId

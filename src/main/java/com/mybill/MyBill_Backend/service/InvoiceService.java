@@ -79,7 +79,7 @@ public class InvoiceService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
-        Client client = clientRepository.findByIdAndUserIdAndIsDeletedFalse(clientId, userId)
+        Client client = clientRepository.findByIdAndUserIdAndIsDeletedFalseWithLock(clientId, userId)
                 .orElseThrow(() -> new NotFoundException("Client not found"));
 
         List<ClientWork> works = workRepository.findAllById(workIds);
@@ -163,15 +163,15 @@ public class InvoiceService {
 
         invoice.setItems(items);
 
+        Invoice savedInvoice = invoiceRepository.save(invoice);
+
         works.forEach(work -> {
             work.setBilled(true);
-            work.setInvoice(invoice);
+            work.setInvoice(savedInvoice);
             work.setUpdatedAt(now);
         });
 
         workRepository.saveAll(works);
-
-        Invoice savedInvoice = invoiceRepository.save(invoice);
         appMetrics.getInvoicesGenerated().increment();
         auditTrailService.logChange("Invoice", savedInvoice.getId(), "CREATE", "Invoice generated with total " + savedInvoice.getTotalAmount());
         clientFinancialService.recordInvoiceCreated(savedInvoice, now);
@@ -192,7 +192,9 @@ public class InvoiceService {
             PaymentMode mode,
             LocalDateTime paymentDate
     ) {
-        Invoice invoice = getInvoiceById(invoiceId);
+        Long userId = securityUtils.getCurrentUserId();
+        Invoice invoice = invoiceRepository.findByIdAndUserIdWithLock(invoiceId, userId)
+                .orElseThrow(() -> new NotFoundException("Invoice not found or access denied"));
         return applyPaymentUpdate(invoice, paidAmount, mode, paymentDate);
     }
 
@@ -247,7 +249,7 @@ public class InvoiceService {
             PaymentMode mode,
             LocalDateTime paymentDate
     ) {
-        Invoice invoice = invoiceRepository.findByIdAndUserId(invoiceId, userId)
+        Invoice invoice = invoiceRepository.findByIdAndUserIdWithLock(invoiceId, userId)
                 .orElseThrow(() -> new NotFoundException("Invoice not found or access denied"));
 
         return applyPaymentUpdate(invoice, paidAmount, mode, paymentDate);
@@ -262,7 +264,7 @@ public class InvoiceService {
             PaymentMode mode,
             LocalDateTime paymentDate
     ) {
-        Invoice invoice = invoiceRepository.findByIdAndUserId(invoiceId, userId)
+        Invoice invoice = invoiceRepository.findByIdAndUserIdWithLock(invoiceId, userId)
                 .orElseThrow(() -> new NotFoundException("Invoice not found or access denied"));
 
         double currentPaid = invoice.getPaidAmount() != null ? invoice.getPaidAmount() : 0.0;
@@ -284,7 +286,7 @@ public class InvoiceService {
             PaymentMode mode,
             LocalDateTime paymentDate
     ) {
-        Invoice invoice = invoiceRepository.findByIdAndUserId(invoiceId, userId)
+        Invoice invoice = invoiceRepository.findByIdAndUserIdWithLock(invoiceId, userId)
                 .orElseThrow(() -> new NotFoundException("Invoice not found or access denied"));
 
         double currentPaid = invoice.getPaidAmount() != null ? invoice.getPaidAmount() : 0.0;

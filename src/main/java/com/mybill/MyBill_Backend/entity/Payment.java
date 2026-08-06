@@ -78,6 +78,11 @@ public class Payment {
     @Column(name = "updated_by")
     private Long updatedBy;
 
+    @Version
+    @Builder.Default
+    @Column(nullable = false)
+    private Integer version = 1;
+
     @PrePersist
     public void prePersist() {
         LocalDateTime now = LocalDateTime.now();
@@ -87,11 +92,13 @@ public class Payment {
         if (updatedAt == null) updatedAt = now;
         if (isDeleted == null) isDeleted = false;
         if (appliedToInvoice == null) appliedToInvoice = false;
+        if (version == null) version = 1;
     }
 
     @PreUpdate
     public void preUpdate() {
         updatedAt = LocalDateTime.now();
+        version = version == null ? 1 : version + 1;
     }
 
     public void markDeleted(LocalDateTime deletedAt) {

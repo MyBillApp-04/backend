@@ -38,7 +38,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
             "/api/login",
             "/api/register",
             "/login",
-            "/register"
+            "/register",
+            "/api/auth/refresh",
+            "/api/auth/logout"
     );
 
     private final SecurityUtils securityUtils;
@@ -131,6 +133,27 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         String userKey = currentUserKey();
+
+        // Financial mutation rate limit
+        boolean isFinancialMutate = false;
+        String method = request.getMethod();
+        if ("POST".equalsIgnoreCase(method)) {
+            if (path.matches("^/api/clients/[^/]+/financial/payments$") || path.equals("/api/invoice/generate")) {
+                isFinancialMutate = true;
+            }
+        } else if ("PATCH".equalsIgnoreCase(method)) {
+            if (path.matches("^/api/invoice/[^/]+/payment$")) {
+                isFinancialMutate = true;
+            }
+        }
+
+        if (isFinancialMutate) {
+            String finKey = (userKey != null ? userKey : ipKey) + ":financial_mutate";
+            if (isExceeded(finKey, 15)) { // Capped at 15 requests per minute
+                reject(response, "Too many financial update requests. Please wait before attempting again", "financial_mutate");
+                return;
+            }
+        }
 
         // 1. Feature/Endpoint specific rate limiting (Heavy resource protection)
         if (path.contains("/pdf")) {

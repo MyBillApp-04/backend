@@ -5,6 +5,8 @@ import com.mybill.MyBill_Backend.entity.User;
 import com.mybill.MyBill_Backend.repository.RefreshTokenRepository;
 import com.mybill.MyBill_Backend.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +21,7 @@ import java.util.HexFormat;
 @Service
 @RequiredArgsConstructor
 public class RefreshTokenService {
+    private static final Logger log = LoggerFactory.getLogger(RefreshTokenService.class);
     private static final SecureRandom RANDOM = new SecureRandom();
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtUtil jwtUtil;
@@ -28,6 +31,11 @@ public class RefreshTokenService {
 
     @Transactional
     public TokenPair issue(User user) {
+        return issue(user, null, null);
+    }
+
+    @Transactional
+    public TokenPair issue(User user, String deviceId, String deviceName) {
         byte[] bytes = new byte[48];
         RANDOM.nextBytes(bytes);
         String rawToken = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
@@ -36,17 +44,32 @@ public class RefreshTokenService {
         refreshToken.setTokenHash(hash(rawToken));
         refreshToken.setCreatedAt(Instant.now());
         refreshToken.setExpiresAt(Instant.now().plusMillis(refreshExpirationMillis));
+        refreshToken.setDeviceId(deviceId);
+        refreshToken.setDeviceName(deviceName);
         refreshTokenRepository.save(refreshToken);
         return new TokenPair(jwtUtil.generateToken(user.getEmail(), user.getRole()), rawToken);
     }
 
     @Transactional
     public TokenPair rotate(String rawToken) {
-        RefreshToken stored = refreshTokenRepository.findByTokenHashAndRevokedAtIsNull(hash(rawToken))
-                .filter(token -> token.getExpiresAt().isAfter(Instant.now()))
+        String tokenHash = hash(rawToken);
+        RefreshToken stored = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new InvalidRefreshTokenException());
+
+        if (stored.getRevokedAt() != null) {
+            log.warn("Security Warning: Reuse of revoked refresh token detected for user ID: {}! Revoking all active tokens for this user.", stored.getUser().getId());
+            refreshTokenRepository.revokeAllByUser(stored.getUser(), Instant.now());
+            throw new InvalidRefreshTokenException();
+        }
+
+        if (stored.getExpiresAt().isBefore(Instant.now())) {
+            throw new InvalidRefreshTokenException();
+        }
+
         stored.setRevokedAt(Instant.now());
-        return issue(stored.getUser());
+        refreshTokenRepository.save(stored);
+        // Preserve device tracking on rotation
+        return issue(stored.getUser(), stored.getDeviceId(), stored.getDeviceName());
     }
 
     @Transactional

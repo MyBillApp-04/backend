@@ -78,7 +78,13 @@ public class AuthEndpointIT {
         // Assert
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().get("error")).isEqualTo("Missing token in request body");
+        // GlobalExceptionHandler sets "error" to the HTTP reason phrase for validation errors;
+        // the per-field messages are nested under "fieldErrors".
+        assertThat(response.getBody().get("error")).isEqualTo("Bad Request");
+        @SuppressWarnings("unchecked")
+        Map<String, String> fieldErrors = (Map<String, String>) response.getBody().get("fieldErrors");
+        assertThat(fieldErrors).isNotNull();
+        assertThat(fieldErrors.get("token")).isNotNull();
     }
 
     @Test

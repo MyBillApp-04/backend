@@ -39,7 +39,9 @@ public class AuthController {
     @PostMapping("/firebase-login")
     public ResponseEntity<?> firebaseLogin(
             @Valid @RequestBody FirebaseLoginRequest body,
-            @RequestHeader(name = "X-Auth-Flow", defaultValue = "login") String requestedFlow
+            @RequestHeader(name = "X-Auth-Flow", defaultValue = "login") String requestedFlow,
+            @RequestHeader(name = "X-Device-Id", required = false) String deviceId,
+            @RequestHeader(name = "X-Device-Name", required = false) String deviceName
     ) {
         String flow = "refresh".equalsIgnoreCase(requestedFlow) ? "refresh" : "login";
         String idToken = body.token();
@@ -79,7 +81,7 @@ public class AuthController {
             }
 
             User user = authService.firebaseLoginUser(email, name, provider, Role.OWNER);
-            RefreshTokenService.TokenPair tokens = refreshTokenService.issue(user);
+            RefreshTokenService.TokenPair tokens = refreshTokenService.issue(user, deviceId, deviceName);
             recordAuthResult("auth_success", flow, "accepted");
             log.info("Successful login via {}", provider);
             return ResponseEntity.ok(Map.of("token", tokens.accessToken(), "refreshToken", tokens.refreshToken()));

@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -98,7 +99,7 @@ public class AuthControllerTest {
         User user = User.builder().email(testEmail).role(Role.OWNER).build();
         when(authService.firebaseLoginUser(eq(testEmail), eq(testName), eq(AuthProvider.GOOGLE), eq(Role.OWNER)))
                 .thenReturn(user);
-        when(refreshTokenService.issue(user)).thenReturn(new RefreshTokenService.TokenPair(testJwt, "refresh-token"));
+        when(refreshTokenService.issue(eq(user), any(), any())).thenReturn(new RefreshTokenService.TokenPair(testJwt, "refresh-token"));
         double before = counterValue("auth_success", "refresh", "accepted");
 
         mockMvc.perform(post("/api/auth/firebase-login")
@@ -133,7 +134,7 @@ public class AuthControllerTest {
         User user = User.builder().email(testEmail).role(Role.OWNER).build();
         when(authService.firebaseLoginUser(eq(testEmail), eq(testName), eq(AuthProvider.LOCAL), eq(Role.OWNER)))
                 .thenReturn(user);
-        when(refreshTokenService.issue(user)).thenReturn(new RefreshTokenService.TokenPair(testJwt, "refresh-token"));
+        when(refreshTokenService.issue(eq(user), any(), any())).thenReturn(new RefreshTokenService.TokenPair(testJwt, "refresh-token"));
 
         mockMvc.perform(post("/api/auth/firebase-login")
                         .contentType(MediaType.APPLICATION_JSON)

@@ -40,9 +40,11 @@ public class JwtUtil {
                 .claim("role", authority)
                 .claim("authorities", List.of(authority))
                 .claim("scope", String.join(" ", scopes))
+                .issuer("mybill-api")
+                .audience().add("mybill-app").and()
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expirationMillis))
-                .signWith(getSigningKey())
+                .signWith(getSigningKey(), Jwts.SIG.HS256)
                 .compact();
     }
 
@@ -135,6 +137,8 @@ public class JwtUtil {
     private Claims getClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())
+                .requireIssuer("mybill-api")
+                .requireAudience("mybill-app")
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
