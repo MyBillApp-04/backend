@@ -21,6 +21,8 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
     Optional<Invoice> findByIdAndUserId(UUID id, Long userId);
 
+    Optional<Invoice> findByQuotationIdAndUserId(UUID quotationId, Long userId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM Invoice i WHERE i.id = :id AND i.user.id = :userId")
     Optional<Invoice> findByIdAndUserIdWithLock(@Param("id") UUID id, @Param("userId") Long userId);

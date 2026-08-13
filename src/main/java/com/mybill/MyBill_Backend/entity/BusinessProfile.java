@@ -40,6 +40,9 @@ public class BusinessProfile {
     private String ownerName;
     private String address;
 
+    /** State (Indian state name or code) used for intra/inter-state GST determination. */
+    private String state;
+
     @Pattern(regexp = "^$|^[0-9]{10}$", message = "Phone must be a 10-digit number")
     private String phone;
 
@@ -118,4 +121,83 @@ public class BusinessProfile {
     public void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+    public String getBusinessName() { return businessName; }
+    public void setBusinessName(String businessName) { this.businessName = businessName; }
+    public String getOwnerName() { return ownerName; }
+    public void setOwnerName(String ownerName) { this.ownerName = ownerName; }
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+    public String getGstin() { return gstin; }
+    public void setGstin(String gstin) { this.gstin = gstin; }
+    public String getBankName() { return bankName; }
+    public void setBankName(String bankName) { this.bankName = bankName; }
+    public String getAccountNumber() { return accountNumber; }
+    public void setAccountNumber(String accountNumber) { this.accountNumber = accountNumber; }
+    public String getIfsc() { return ifsc; }
+    public void setIfsc(String ifsc) { this.ifsc = ifsc; }
+    public String getUpiId() { return upiId; }
+    public void setUpiId(String upiId) { this.upiId = upiId; }
+    public String getLogoPath() { return logoPath; }
+    public void setLogoPath(String logoPath) { this.logoPath = logoPath; }
+    public String getQrImagePath() { return qrImagePath; }
+    public void setQrImagePath(String qrImagePath) { this.qrImagePath = qrImagePath; }
+    public String getSignaturePath() { return signaturePath; }
+    public void setSignaturePath(String signaturePath) { this.signaturePath = signaturePath; }
+    public String getLogoPublicId() { return logoPublicId; }
+    public void setLogoPublicId(String logoPublicId) { this.logoPublicId = logoPublicId; }
+    public String getLogoResourceType() { return logoResourceType; }
+    public void setLogoResourceType(String logoResourceType) { this.logoResourceType = logoResourceType; }
+    public Integer getLogoWidth() { return logoWidth; }
+    public void setLogoWidth(Integer logoWidth) { this.logoWidth = logoWidth; }
+    public Integer getLogoHeight() { return logoHeight; }
+    public void setLogoHeight(Integer logoHeight) { this.logoHeight = logoHeight; }
+    public String getLogoFormat() { return logoFormat; }
+    public void setLogoFormat(String logoFormat) { this.logoFormat = logoFormat; }
+    public String getQrImagePublicId() { return qrImagePublicId; }
+    public void setQrImagePublicId(String qrImagePublicId) { this.qrImagePublicId = qrImagePublicId; }
+    public String getQrImageResourceType() { return qrImageResourceType; }
+    public void setQrImageResourceType(String qrImageResourceType) { this.qrImageResourceType = qrImageResourceType; }
+    public Integer getQrImageWidth() { return qrImageWidth; }
+    public void setQrImageWidth(Integer qrImageWidth) { this.qrImageWidth = qrImageWidth; }
+    public Integer getQrImageHeight() { return qrImageHeight; }
+    public void setQrImageHeight(Integer qrImageHeight) { this.qrImageHeight = qrImageHeight; }
+    public String getQrImageFormat() { return qrImageFormat; }
+    public void setQrImageFormat(String qrImageFormat) { this.qrImageFormat = qrImageFormat; }
+    public String getSignaturePublicId() { return signaturePublicId; }
+    public void setSignaturePublicId(String signaturePublicId) { this.signaturePublicId = signaturePublicId; }
+    public String getSignatureResourceType() { return signatureResourceType; }
+    public void setSignatureResourceType(String signatureResourceType) { this.signatureResourceType = signatureResourceType; }
+    public Integer getSignatureWidth() { return signatureWidth; }
+    public void setSignatureWidth(Integer signatureWidth) { this.signatureWidth = signatureWidth; }
+    public Integer getSignatureHeight() { return signatureHeight; }
+    public void setSignatureHeight(Integer signatureHeight) { this.signatureHeight = signatureHeight; }
+    public String getSignatureFormat() { return signatureFormat; }
+    public void setSignatureFormat(String signatureFormat) { this.signatureFormat = signatureFormat; }
+    public String getThankYouNote() { return thankYouNote; }
+    public void setThankYouNote(String thankYouNote) { this.thankYouNote = thankYouNote; }
+    public String getTermsAndConditions() { return termsAndConditions; }
+    public void setTermsAndConditions(String termsAndConditions) { this.termsAndConditions = termsAndConditions; }
+    public String getInvoicePrefix() { return invoicePrefix; }
+    public void setInvoicePrefix(String invoicePrefix) { this.invoicePrefix = invoicePrefix; }
+    public Integer getNextInvoiceNumber() { return nextInvoiceNumber; }
+    public void setNextInvoiceNumber(Integer nextInvoiceNumber) { this.nextInvoiceNumber = nextInvoiceNumber; }
+    public Boolean getFinancialYearEnabled() { return financialYearEnabled; }
+    public void setFinancialYearEnabled(Boolean financialYearEnabled) { this.financialYearEnabled = financialYearEnabled; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public Long getCreatedBy() { return createdBy; }
+    public void setCreatedBy(Long createdBy) { this.createdBy = createdBy; }
+    public Long getUpdatedBy() { return updatedBy; }
+    public void setUpdatedBy(Long updatedBy) { this.updatedBy = updatedBy; }
 }

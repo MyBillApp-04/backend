@@ -103,6 +103,8 @@ public class ClientController {
         client.setPhone(request.getPhone());
         client.setEmail(request.getEmail());
         client.setAddress(request.getAddress());
+        client.setState(request.getState());
+        client.setGstin(request.getGstin());
         client.setDeviceId(request.getDeviceId());
 
         return client;

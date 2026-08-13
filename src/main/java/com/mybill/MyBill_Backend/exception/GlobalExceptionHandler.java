@@ -193,14 +193,30 @@ public class GlobalExceptionHandler {
             ConstraintViolationException ex,
             HttpServletRequest request
     ) {
-        log.warn("Constraint violation: exception={}", ex.getClass().getSimpleName());
+        log.warn("Constraint violation for {}: message={}", request.getRequestURI(), ex.getMessage());
 
-        return buildErrorResponse(
-                HttpStatus.BAD_REQUEST,
-                "Validation failed",
-                request.getRequestURI(),
-                ex
-        );
+        Map<String, String> fieldErrors = new HashMap<>();
+        if (ex.getConstraintViolations() != null) {
+            for (jakarta.validation.ConstraintViolation<?> violation : ex.getConstraintViolations()) {
+                fieldErrors.put(
+                        violation.getPropertyPath() != null ? violation.getPropertyPath().toString() : "unknown",
+                        violation.getMessage() != null ? violation.getMessage() : "Invalid value"
+                );
+            }
+        }
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.BAD_REQUEST.value());
+        body.put("error", HttpStatus.BAD_REQUEST.getReasonPhrase());
+        body.put("message", ex.getMessage() != null && !ex.getMessage().isBlank() ? ex.getMessage() : "Validation failed");
+        body.put("path", request.getRequestURI());
+        body.put("requestId", currentRequestId());
+        body.put("fieldErrors", fieldErrors);
+
+        incrementErrorMetric(HttpStatus.BAD_REQUEST, ex, request.getRequestURI());
+
+        return ResponseEntity.badRequest().body(body);
     }
 
     @ExceptionHandler(MissingRequestHeaderException.class)
@@ -315,6 +331,21 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "Database save failed. Please check the submitted profile details",
+                request.getRequestURI(),
+                ex
+        );
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalState(
+            IllegalStateException ex,
+            HttpServletRequest request
+    ) {
+        log.warn("Business rule violation: exception={}", ex.getClass().getSimpleName());
+
+        return buildErrorResponse(
+                HttpStatus.CONFLICT,
+                ex.getMessage() != null ? ex.getMessage() : "Operation cannot be completed in the current state",
                 request.getRequestURI(),
                 ex
         );
@@ -475,11 +506,12 @@ public class GlobalExceptionHandler {
             return;
         }
 
-        log.warn("api_error severity=WARN category={} status={} path={} userId={} resourceId={} exception={} message={} requestId={}",
+        log.warn("api_error severity=WARN category={} status={} path={} userId={} resourceId={} exception={} message={} userMessage={} requestId={}",
                 category, status.value(), path, userId, resourceId,
                 ex != null ? ex.getClass().getSimpleName() : "None",
                 SecureLogMessageConverter.sanitize(message),
-                currentRequestId());
+                safeMessage(ex),
+                currentRequestId(), ex);
     }
 
     private String safeMessage(Throwable ex) {

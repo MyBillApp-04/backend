@@ -26,6 +26,19 @@ public interface InvoiceItemRepository extends JpaRepository<InvoiceItem, UUID> 
             Long userId
     );
 
+    @EntityGraph(attributePaths = {"invoice", "work"})
+    @Query("""
+           SELECT item
+           FROM InvoiceItem item
+           WHERE item.work.id IN :workIds
+             AND item.user.id = :userId
+             AND item.isDeleted = false
+           """)
+    List<InvoiceItem> findByWorkIdInAndUserIdAndIsDeletedFalse(
+            @Param("workIds") List<UUID> workIds,
+            @Param("userId") Long userId
+    );
+
     boolean existsByWorkIdAndUserIdAndIsDeletedFalse(UUID workId, Long userId);
 
     Optional<InvoiceItem> findByIdAndUserId(UUID id, Long userId);

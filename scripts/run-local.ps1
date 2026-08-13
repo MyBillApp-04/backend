@@ -44,7 +44,7 @@ Get-Content -LiteralPath $envPath | ForEach-Object {
     [Environment]::SetEnvironmentVariable($name, $value, [EnvironmentVariableTarget]::Process)
 }
 
-if ($MavenArgs.Count -eq 0) {
+if ($null -eq $MavenArgs -or $MavenArgs.Length -eq 0) {
     $MavenArgs = @('spring-boot:run')
 }
 

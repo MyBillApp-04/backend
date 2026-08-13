@@ -60,6 +60,12 @@ public class QuotationController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/convert")
+    public ResponseEntity<com.mybill.MyBill_Backend.entity.Invoice> convertToInvoice(@PathVariable UUID id) {
+        com.mybill.MyBill_Backend.entity.Invoice invoice = quotationService.convertQuotationToInvoice(id);
+        return ResponseEntity.status(HttpStatus.CREATED).body(invoice);
+    }
+
     @PostMapping("/{id}/public-link")
     public ResponseEntity<?> generatePublicLink(@PathVariable UUID id) {
         Long userId = securityUtils.getCurrentUserId();

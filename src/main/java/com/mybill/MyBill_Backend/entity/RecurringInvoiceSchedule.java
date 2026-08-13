@@ -99,4 +99,123 @@ public class RecurringInvoiceSchedule {
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
+
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+
+    public Client getClient() { return client; }
+    public void setClient(Client client) { this.client = client; }
+
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+
+    public BigDecimal getAmount() { return amount; }
+    public void setAmount(BigDecimal amount) { this.amount = amount; }
+
+    public String getBillingCycle() { return billingCycle; }
+    public void setBillingCycle(String billingCycle) { this.billingCycle = billingCycle; }
+
+    public String getCronExpression() { return cronExpression; }
+    public void setCronExpression(String cronExpression) { this.cronExpression = cronExpression; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
+    public LocalDate getStartDate() { return startDate; }
+    public void setStartDate(LocalDate startDate) { this.startDate = startDate; }
+
+    public LocalDate getEndDate() { return endDate; }
+    public void setEndDate(LocalDate endDate) { this.endDate = endDate; }
+
+    public LocalDateTime getNextRunDate() { return nextRunDate; }
+    public void setNextRunDate(LocalDateTime nextRunDate) { this.nextRunDate = nextRunDate; }
+
+    public LocalDateTime getLastRunDate() { return lastRunDate; }
+    public void setLastRunDate(LocalDateTime lastRunDate) { this.lastRunDate = lastRunDate; }
+
+    public Boolean getAutoCharge() { return autoCharge; }
+    public void setAutoCharge(Boolean autoCharge) { this.autoCharge = autoCharge; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public Boolean getIsDeleted() { return isDeleted; }
+    public void setIsDeleted(Boolean isDeleted) { this.isDeleted = isDeleted; }
+
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
+
+    public Integer getVersion() { return version; }
+    public void setVersion(Integer version) { this.version = version; }
+
+    public static RecurringInvoiceScheduleBuilder builder() { return new RecurringInvoiceScheduleBuilder(); }
+
+    public static class RecurringInvoiceScheduleBuilder {
+        private UUID id;
+        private Client client;
+        private User user;
+        private String description;
+        private BigDecimal amount;
+        private String billingCycle;
+        private String cronExpression;
+        private String status = "ACTIVE";
+        private LocalDate startDate;
+        private LocalDate endDate;
+        private LocalDateTime nextRunDate;
+        private LocalDateTime lastRunDate;
+        private Boolean autoCharge = false;
+        private LocalDateTime createdAt;
+        private LocalDateTime updatedAt;
+        private Boolean isDeleted = false;
+        private LocalDateTime deletedAt;
+        private Integer version = 1;
+
+        public RecurringInvoiceScheduleBuilder id(UUID id) { this.id = id; return this; }
+        public RecurringInvoiceScheduleBuilder client(Client client) { this.client = client; return this; }
+        public RecurringInvoiceScheduleBuilder user(User user) { this.user = user; return this; }
+        public RecurringInvoiceScheduleBuilder description(String description) { this.description = description; return this; }
+        public RecurringInvoiceScheduleBuilder amount(BigDecimal amount) { this.amount = amount; return this; }
+        public RecurringInvoiceScheduleBuilder billingCycle(String billingCycle) { this.billingCycle = billingCycle; return this; }
+        public RecurringInvoiceScheduleBuilder cronExpression(String cronExpression) { this.cronExpression = cronExpression; return this; }
+        public RecurringInvoiceScheduleBuilder status(String status) { this.status = status; return this; }
+        public RecurringInvoiceScheduleBuilder startDate(LocalDate startDate) { this.startDate = startDate; return this; }
+        public RecurringInvoiceScheduleBuilder endDate(LocalDate endDate) { this.endDate = endDate; return this; }
+        public RecurringInvoiceScheduleBuilder nextRunDate(LocalDateTime nextRunDate) { this.nextRunDate = nextRunDate; return this; }
+        public RecurringInvoiceScheduleBuilder lastRunDate(LocalDateTime lastRunDate) { this.lastRunDate = lastRunDate; return this; }
+        public RecurringInvoiceScheduleBuilder autoCharge(Boolean autoCharge) { this.autoCharge = autoCharge; return this; }
+        public RecurringInvoiceScheduleBuilder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
+        public RecurringInvoiceScheduleBuilder updatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; return this; }
+        public RecurringInvoiceScheduleBuilder isDeleted(Boolean isDeleted) { this.isDeleted = isDeleted; return this; }
+        public RecurringInvoiceScheduleBuilder deletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; return this; }
+        public RecurringInvoiceScheduleBuilder version(Integer version) { this.version = version; return this; }
+
+        public RecurringInvoiceSchedule build() {
+            RecurringInvoiceSchedule s = new RecurringInvoiceSchedule();
+            s.id = this.id;
+            s.client = this.client;
+            s.user = this.user;
+            s.description = this.description;
+            s.amount = this.amount;
+            s.billingCycle = this.billingCycle;
+            s.cronExpression = this.cronExpression;
+            s.status = this.status;
+            s.startDate = this.startDate;
+            s.endDate = this.endDate;
+            s.nextRunDate = this.nextRunDate;
+            s.lastRunDate = this.lastRunDate;
+            s.autoCharge = this.autoCharge;
+            s.createdAt = this.createdAt;
+            s.updatedAt = this.updatedAt;
+            s.isDeleted = this.isDeleted;
+            s.deletedAt = this.deletedAt;
+            s.version = this.version;
+            return s;
+        }
+    }
 }

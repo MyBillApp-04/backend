@@ -47,32 +47,20 @@ public interface QuotationRepository extends JpaRepository<Quotation, UUID> {
             Pageable pageable
     );
 
-    @Query(value = """
-           SELECT q.*
-           FROM public.quotation q
-           LEFT JOIN public.clients c ON c.id = q.client_id
-           WHERE q.user_id = :userId
-             AND COALESCE(q.is_deleted, false) = false
+    @EntityGraph(attributePaths = {"client"})
+    @Query("""
+           SELECT q
+           FROM Quotation q
+           LEFT JOIN q.client c
+           WHERE q.user.id = :userId
+             AND q.isDeleted = false
              AND (
                 :safeQuery = ''
-                OR LOWER(COALESCE(c.name, '')) LIKE LOWER(CONCAT('%', :safeQuery, '%'))
-                OR LOWER(COALESCE(q.quotation_number, '')) LIKE LOWER(CONCAT('%', :safeQuery, '%'))
+                OR LOWER(c.name) LIKE LOWER(CONCAT('%', :safeQuery, '%'))
+                OR LOWER(q.quotationNumber) LIKE LOWER(CONCAT('%', :safeQuery, '%'))
              )
-           ORDER BY q.created_at DESC
-           """,
-           countQuery = """
-           SELECT COUNT(*)
-           FROM public.quotation q
-           LEFT JOIN public.clients c ON c.id = q.client_id
-           WHERE q.user_id = :userId
-             AND COALESCE(q.is_deleted, false) = false
-             AND (
-                :safeQuery = ''
-                OR LOWER(COALESCE(c.name, '')) LIKE LOWER(CONCAT('%', :safeQuery, '%'))
-                OR LOWER(COALESCE(q.quotation_number, '')) LIKE LOWER(CONCAT('%', :safeQuery, '%'))
-             )
-           """,
-           nativeQuery = true)
+           ORDER BY q.createdAt DESC
+           """)
     Page<Quotation> searchQuotations(
             @Param("userId") Long userId,
             @Param("safeQuery") String safeQuery,

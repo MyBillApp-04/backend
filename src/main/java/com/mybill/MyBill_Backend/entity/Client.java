@@ -29,10 +29,16 @@ public class Client {
     @Column(columnDefinition = "uuid")
     private UUID id;
 
-    private String name;
+private String name;
     private String phone;
     private String email;
     private String address;
+
+    /** Indian state name/code for GST intra/inter-state determination. */
+    private String state;
+
+    /** Optional GSTIN for the customer. Not mandatory for charging tax. */
+    private String gstin;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -109,4 +115,35 @@ public class Client {
         this.deletedAt = timestamp;
         this.updatedAt = timestamp;
     }
+
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
+    public Boolean getIsDeleted() { return isDeleted; }
+    public void setIsDeleted(Boolean isDeleted) { this.isDeleted = isDeleted; }
+    public String getDeviceId() { return deviceId; }
+    public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
+    public Integer getVersion() { return version; }
+    public void setVersion(Integer version) { this.version = version; }
+    public Long getCreatedBy() { return createdBy; }
+    public void setCreatedBy(Long createdBy) { this.createdBy = createdBy; }
+    public Long getUpdatedBy() { return updatedBy; }
+    public void setUpdatedBy(Long updatedBy) { this.updatedBy = updatedBy; }
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+    public List<ClientWork> getWorks() { return works; }
+    public void setWorks(List<ClientWork> works) { this.works = works; }
 }

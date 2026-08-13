@@ -33,8 +33,29 @@ public class SyncRequest {
     @Max(value = 500, message = "Page size must be 500 or fewer")
     private Integer pageSize;
 
-    @Pattern(regexp = "^(CLIENT_WINS|SERVER_WINS)?$", message = "Conflict policy must be CLIENT_WINS or SERVER_WINS")
+    @Pattern(regexp = "(?i)^(CLIENT_WINS|SERVER_WINS)?$", message = "Conflict policy must be CLIENT_WINS or SERVER_WINS")
     private String conflictPolicy;
 
     private Boolean background;
+
+    public String getDeviceId() { return deviceId; }
+    public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
+
+    public LocalDateTime getLastPulledAt() { return lastPulledAt; }
+    public void setLastPulledAt(LocalDateTime lastPulledAt) { this.lastPulledAt = lastPulledAt; }
+
+    public List<SyncChangeDto> getChanges() { return changes; }
+    public void setChanges(List<SyncChangeDto> changes) { this.changes = changes; }
+
+    public String getCursor() { return cursor; }
+    public void setCursor(String cursor) { this.cursor = cursor; }
+
+    public Integer getPageSize() { return pageSize; }
+    public void setPageSize(Integer pageSize) { this.pageSize = pageSize; }
+
+    public String getConflictPolicy() { return conflictPolicy; }
+    public void setConflictPolicy(String conflictPolicy) { this.conflictPolicy = conflictPolicy; }
+
+    public Boolean getBackground() { return background; }
+    public void setBackground(Boolean background) { this.background = background; }
 }

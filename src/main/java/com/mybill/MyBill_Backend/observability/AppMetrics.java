@@ -89,4 +89,15 @@ public class AppMetrics {
     public void recordPaymentDuration(long durationMs) {
         paymentProcessingTime.record(durationMs, TimeUnit.MILLISECONDS);
     }
+
+    public Counter getPaymentsReceived() { return paymentsReceived; }
+    public Counter getPaymentFailures() { return paymentFailures; }
+    public Timer getPaymentProcessingTime() { return paymentProcessingTime; }
+    public Counter getInvoicesGenerated() { return invoicesGenerated; }
+    public Counter getInvoicesFullyPaid() { return invoicesFullyPaid; }
+    public Counter getFraudFlagged() { return fraudFlagged; }
+    public Counter getFraudFraudulent() { return fraudFraudulent; }
+    public Counter getAuthSuccesses() { return authSuccesses; }
+    public Counter getAuthFailures() { return authFailures; }
+    public Counter getRetentionRecordsPruned() { return retentionRecordsPruned; }
 }

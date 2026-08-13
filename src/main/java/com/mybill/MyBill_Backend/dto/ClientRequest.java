@@ -31,6 +31,16 @@ public class ClientRequest {
     @Size(max = 500, message = "Address must be 500 characters or fewer")
     private String address;
 
+    @Size(max = 100, message = "State must be 100 characters or fewer")
+    private String state;
+
+    @Pattern(
+            regexp = "^$|^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$",
+            message = "GSTIN must be valid"
+    )
+    @Size(max = 50, message = "GSTIN must be 50 characters or fewer")
+    private String gstin;
+
     @Size(max = 120, message = "Device ID must be 120 characters or fewer")
     private String deviceId;
 
@@ -72,6 +82,22 @@ public class ClientRequest {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public String getState() {
+        return clean(state);
+    }
+
+    public void setState(String state) {
+        this.state = state;
+    }
+
+    public String getGstin() {
+        return clean(gstin);
+    }
+
+    public void setGstin(String gstin) {
+        this.gstin = gstin;
     }
 
     public String getDeviceId() {

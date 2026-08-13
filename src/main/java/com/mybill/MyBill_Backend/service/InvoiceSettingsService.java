@@ -64,6 +64,9 @@ public class InvoiceSettingsService {
                 .showLogo(true)
                 .taxIdLabel("")
                 .taxIdValue("")
+                .quotationPrefix("QT")
+                .nextQuotationNumber(1)
+                .defaultQuotationValidityDays(30)
                 .build();
         try {
             return repository.save(defaults);
@@ -109,5 +112,19 @@ public class InvoiceSettingsService {
         settings.setShowLogo(incoming.getShowLogo() != null ? incoming.getShowLogo() : true);
         settings.setTaxIdLabel(cleanOrEmpty(incoming.getTaxIdLabel()));
         settings.setTaxIdValue(cleanOrEmpty(incoming.getTaxIdValue()));
+        settings.setQuotationPrefix(normalizeQuotationPrefix(incoming.getQuotationPrefix()));
+        settings.setNextQuotationNumber(incoming.getNextQuotationNumber() != null ? incoming.getNextQuotationNumber() : 1);
+        settings.setDefaultQuotationValidityDays(incoming.getDefaultQuotationValidityDays() != null ? incoming.getDefaultQuotationValidityDays() : 30);
+    }
+
+    private String normalizeQuotationPrefix(String value) {
+        String cleaned = clean(value);
+        if (cleaned == null) return "QT";
+        String normalized = cleaned.toUpperCase();
+        while (normalized.endsWith("-")) {
+            normalized = normalized.substring(0, normalized.length() - 1).trim();
+        }
+        if (!normalized.matches("[A-Z0-9]{1,8}")) return "QT";
+        return normalized;
     }
 }

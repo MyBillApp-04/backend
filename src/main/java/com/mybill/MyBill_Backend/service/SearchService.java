@@ -48,8 +48,18 @@ public class SearchService {
                 .works(workRepository.searchByUserIdAndQuery(userId, safeQuery, boundedPageable)
                         .map(this::workToMap)
                         .toList())
-                .invoices(invoiceRepository.searchInvoices(userId, safeQuery, null, null, boundedPageable)
-                        .map(this::invoiceToMap)
+                .invoices(invoiceRepository.searchProjectedInvoices(userId, safeQuery, null, null, boundedPageable)
+                        .map(inv -> {
+                            Map<String, Object> m = new LinkedHashMap<>();
+                            m.put("id", inv.getId());
+                            m.put("invoiceNumber", inv.getInvoiceNumber());
+                            m.put("totalAmount", inv.getTotalAmount());
+                            m.put("paidAmount", inv.getPaidAmount());
+                            m.put("remainingAmount", inv.getPendingAmount());
+                            m.put("paymentStatus", inv.getPaymentStatus());
+                            m.put("clientName", inv.getClient() != null ? inv.getClient().getName() : null);
+                            return m;
+                        })
                         .toList())
                 .quotations(quotationRepository.searchQuotations(userId, safeQuery, boundedPageable)
                         .map(this::quotationToMap)

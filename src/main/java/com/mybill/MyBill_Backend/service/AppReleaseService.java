@@ -24,6 +24,7 @@ import java.util.Optional;
 @Transactional
 @Slf4j
 public class AppReleaseService {
+
     private final AppReleaseRepository repository;
     private final SecurityUtils securityUtils;
     private static final String SOFT_MESSAGE = "A new MyBill update is available. You can update now or later.";

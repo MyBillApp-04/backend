@@ -178,4 +178,207 @@ public class Quotation {
         this.deletedAt = timestamp;
         this.updatedAt = timestamp;
     }
+
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+
+    public Client getClient() { return client; }
+    public void setClient(Client client) { this.client = client; }
+
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+
+    public String getQuotationNumber() { return quotationNumber; }
+    public void setQuotationNumber(String quotationNumber) { this.quotationNumber = quotationNumber; }
+
+    public QuotationStatus getStatus() { return status; }
+    public void setStatus(QuotationStatus status) { this.status = status; }
+
+    public LocalDateTime getIssueDate() { return issueDate; }
+    public void setIssueDate(LocalDateTime issueDate) { this.issueDate = issueDate; }
+
+    public LocalDateTime getValidUntilDate() { return validUntilDate; }
+    public void setValidUntilDate(LocalDateTime validUntilDate) { this.validUntilDate = validUntilDate; }
+
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
+
+    public String getTermsAndConditions() { return termsAndConditions; }
+    public void setTermsAndConditions(String termsAndConditions) { this.termsAndConditions = termsAndConditions; }
+
+    public String getPdfUrl() { return pdfUrl; }
+    public void setPdfUrl(String pdfUrl) { this.pdfUrl = pdfUrl; }
+
+    public String getPdfPath() { return pdfPath; }
+    public void setPdfPath(String pdfPath) { this.pdfPath = pdfPath; }
+
+    public Double getSubtotal() { return subtotal; }
+    public void setSubtotal(Double subtotal) { this.subtotal = subtotal; }
+
+    public Double getDiscount() { return discount; }
+    public void setDiscount(Double discount) { this.discount = discount; }
+
+    public Double getGrossAmount() { return grossAmount; }
+    public void setGrossAmount(Double grossAmount) { this.grossAmount = grossAmount; }
+
+    public Double getTotalAmount() { return totalAmount; }
+    public void setTotalAmount(Double totalAmount) { this.totalAmount = totalAmount; }
+
+    public Double getNetPayable() { return netPayable; }
+    public void setNetPayable(Double netPayable) { this.netPayable = netPayable; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
+
+    public Boolean getIsDeleted() { return isDeleted; }
+    public void setIsDeleted(Boolean isDeleted) { this.isDeleted = isDeleted; }
+
+    public String getDeviceId() { return deviceId; }
+    public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
+
+    public String getPublicTokenHash() { return publicTokenHash; }
+    public void setPublicTokenHash(String publicTokenHash) { this.publicTokenHash = publicTokenHash; }
+
+    public String getPublicToken() { return publicToken; }
+    public void setPublicToken(String publicToken) { this.publicToken = publicToken; }
+
+    public LocalDateTime getTokenCreatedAt() { return tokenCreatedAt; }
+    public void setTokenCreatedAt(LocalDateTime tokenCreatedAt) { this.tokenCreatedAt = tokenCreatedAt; }
+
+    public LocalDateTime getTokenExpiresAt() { return tokenExpiresAt; }
+    public void setTokenExpiresAt(LocalDateTime tokenExpiresAt) { this.tokenExpiresAt = tokenExpiresAt; }
+
+    public LocalDateTime getTokenRevokedAt() { return tokenRevokedAt; }
+    public void setTokenRevokedAt(LocalDateTime tokenRevokedAt) { this.tokenRevokedAt = tokenRevokedAt; }
+
+    public String getClientResponseStatus() { return clientResponseStatus; }
+    public void setClientResponseStatus(String clientResponseStatus) { this.clientResponseStatus = clientResponseStatus; }
+
+    public LocalDateTime getRespondedAt() { return respondedAt; }
+    public void setRespondedAt(LocalDateTime respondedAt) { this.respondedAt = respondedAt; }
+
+    public String getDiscussionMessage() { return discussionMessage; }
+    public void setDiscussionMessage(String discussionMessage) { this.discussionMessage = discussionMessage; }
+
+    public Integer getVersion() { return version; }
+    public void setVersion(Integer version) { this.version = version; }
+
+    public Long getCreatedBy() { return createdBy; }
+    public void setCreatedBy(Long createdBy) { this.createdBy = createdBy; }
+
+    public Long getUpdatedBy() { return updatedBy; }
+    public void setUpdatedBy(Long updatedBy) { this.updatedBy = updatedBy; }
+
+    public List<QuotationItem> getItems() { return items; }
+    public void setItems(List<QuotationItem> items) { this.items = items; }
+
+    public static QuotationBuilder builder() { return new QuotationBuilder(); }
+
+    public static class QuotationBuilder {
+        private UUID id;
+        private Client client;
+        private User user;
+        private String quotationNumber;
+        private QuotationStatus status = QuotationStatus.DRAFT;
+        private LocalDateTime issueDate;
+        private LocalDateTime validUntilDate;
+        private String notes;
+        private String termsAndConditions;
+        private String pdfUrl;
+        private String pdfPath;
+        private Double subtotal = 0.0;
+        private Double discount = 0.0;
+        private Double grossAmount;
+        private Double totalAmount = 0.0;
+        private Double netPayable;
+        private LocalDateTime createdAt;
+        private LocalDateTime updatedAt;
+        private LocalDateTime deletedAt;
+        private Boolean isDeleted = false;
+        private String deviceId;
+        private String publicTokenHash;
+        private String publicToken;
+        private LocalDateTime tokenCreatedAt;
+        private LocalDateTime tokenExpiresAt;
+        private LocalDateTime tokenRevokedAt;
+        private String clientResponseStatus;
+        private LocalDateTime respondedAt;
+        private String discussionMessage;
+        private Integer version = 1;
+        private List<QuotationItem> items = new ArrayList<>();
+
+        public QuotationBuilder id(UUID id) { this.id = id; return this; }
+        public QuotationBuilder client(Client client) { this.client = client; return this; }
+        public QuotationBuilder user(User user) { this.user = user; return this; }
+        public QuotationBuilder quotationNumber(String quotationNumber) { this.quotationNumber = quotationNumber; return this; }
+        public QuotationBuilder status(QuotationStatus status) { this.status = status; return this; }
+        public QuotationBuilder issueDate(LocalDateTime issueDate) { this.issueDate = issueDate; return this; }
+        public QuotationBuilder validUntilDate(LocalDateTime validUntilDate) { this.validUntilDate = validUntilDate; return this; }
+        public QuotationBuilder notes(String notes) { this.notes = notes; return this; }
+        public QuotationBuilder termsAndConditions(String termsAndConditions) { this.termsAndConditions = termsAndConditions; return this; }
+        public QuotationBuilder pdfUrl(String pdfUrl) { this.pdfUrl = pdfUrl; return this; }
+        public QuotationBuilder pdfPath(String pdfPath) { this.pdfPath = pdfPath; return this; }
+        public QuotationBuilder subtotal(Double subtotal) { this.subtotal = subtotal; return this; }
+        public QuotationBuilder discount(Double discount) { this.discount = discount; return this; }
+        public QuotationBuilder grossAmount(Double grossAmount) { this.grossAmount = grossAmount; return this; }
+        public QuotationBuilder totalAmount(Double totalAmount) { this.totalAmount = totalAmount; return this; }
+        public QuotationBuilder netPayable(Double netPayable) { this.netPayable = netPayable; return this; }
+        public QuotationBuilder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
+        public QuotationBuilder updatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; return this; }
+        public QuotationBuilder deletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; return this; }
+        public QuotationBuilder isDeleted(Boolean isDeleted) { this.isDeleted = isDeleted; return this; }
+        public QuotationBuilder deviceId(String deviceId) { this.deviceId = deviceId; return this; }
+        public QuotationBuilder publicTokenHash(String publicTokenHash) { this.publicTokenHash = publicTokenHash; return this; }
+        public QuotationBuilder publicToken(String publicToken) { this.publicToken = publicToken; return this; }
+        public QuotationBuilder tokenCreatedAt(LocalDateTime tokenCreatedAt) { this.tokenCreatedAt = tokenCreatedAt; return this; }
+        public QuotationBuilder tokenExpiresAt(LocalDateTime tokenExpiresAt) { this.tokenExpiresAt = tokenExpiresAt; return this; }
+        public QuotationBuilder tokenRevokedAt(LocalDateTime tokenRevokedAt) { this.tokenRevokedAt = tokenRevokedAt; return this; }
+        public QuotationBuilder clientResponseStatus(String clientResponseStatus) { this.clientResponseStatus = clientResponseStatus; return this; }
+        public QuotationBuilder respondedAt(LocalDateTime respondedAt) { this.respondedAt = respondedAt; return this; }
+        public QuotationBuilder discussionMessage(String discussionMessage) { this.discussionMessage = discussionMessage; return this; }
+        public QuotationBuilder version(Integer version) { this.version = version; return this; }
+        public QuotationBuilder items(List<QuotationItem> items) { this.items = items; return this; }
+
+        public Quotation build() {
+            Quotation q = new Quotation();
+            q.id = this.id;
+            q.client = this.client;
+            q.user = this.user;
+            q.quotationNumber = this.quotationNumber;
+            q.status = this.status;
+            q.issueDate = this.issueDate;
+            q.validUntilDate = this.validUntilDate;
+            q.notes = this.notes;
+            q.termsAndConditions = this.termsAndConditions;
+            q.pdfUrl = this.pdfUrl;
+            q.pdfPath = this.pdfPath;
+            q.subtotal = this.subtotal;
+            q.discount = this.discount;
+            q.grossAmount = this.grossAmount;
+            q.totalAmount = this.totalAmount;
+            q.netPayable = this.netPayable;
+            q.createdAt = this.createdAt;
+            q.updatedAt = this.updatedAt;
+            q.deletedAt = this.deletedAt;
+            q.isDeleted = this.isDeleted;
+            q.deviceId = this.deviceId;
+            q.publicTokenHash = this.publicTokenHash;
+            q.publicToken = this.publicToken;
+            q.tokenCreatedAt = this.tokenCreatedAt;
+            q.tokenExpiresAt = this.tokenExpiresAt;
+            q.tokenRevokedAt = this.tokenRevokedAt;
+            q.clientResponseStatus = this.clientResponseStatus;
+            q.respondedAt = this.respondedAt;
+            q.discussionMessage = this.discussionMessage;
+            q.version = this.version;
+            q.items = this.items;
+            return q;
+        }
+    }
 }

@@ -35,4 +35,15 @@ public class ReceivePaymentRequest {
 
     @Size(max = 120, message = "Device ID must be 120 characters or fewer")
     private String deviceId;
+
+    public BigDecimal getAmount() { return amount; }
+    public void setAmount(BigDecimal amount) { this.amount = amount; }
+    public PaymentMode getPaymentMode() { return paymentMode; }
+    public void setPaymentMode(PaymentMode paymentMode) { this.paymentMode = paymentMode; }
+    public LocalDateTime getPaymentDate() { return paymentDate; }
+    public void setPaymentDate(LocalDateTime paymentDate) { this.paymentDate = paymentDate; }
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
+    public String getDeviceId() { return deviceId; }
+    public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
 }

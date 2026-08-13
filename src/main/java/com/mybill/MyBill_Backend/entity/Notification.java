@@ -80,4 +80,75 @@ public class Notification {
         this.deletedAt = timestamp;
         this.updatedAt = timestamp;
     }
+
+    public UUID getNotificationId() { return notificationId; }
+    public void setNotificationId(UUID notificationId) { this.notificationId = notificationId; }
+
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+
+    public String getMessage() { return message; }
+    public void setMessage(String message) { this.message = message; }
+
+    public Boolean getIsRead() { return isRead; }
+    public void setIsRead(Boolean isRead) { this.isRead = isRead; }
+
+    public Boolean getIsDeleted() { return isDeleted; }
+    public void setIsDeleted(Boolean isDeleted) { this.isDeleted = isDeleted; }
+
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public Long getCreatedBy() { return createdBy; }
+    public void setCreatedBy(Long createdBy) { this.createdBy = createdBy; }
+
+    public Long getUpdatedBy() { return updatedBy; }
+    public void setUpdatedBy(Long updatedBy) { this.updatedBy = updatedBy; }
+
+    public static NotificationBuilder builder() { return new NotificationBuilder(); }
+
+    public static class NotificationBuilder {
+        private UUID notificationId;
+        private User user;
+        private String title;
+        private String message;
+        private Boolean isRead = false;
+        private Boolean isDeleted = false;
+        private LocalDateTime deletedAt;
+        private LocalDateTime createdAt;
+        private LocalDateTime updatedAt;
+
+        public NotificationBuilder notificationId(UUID notificationId) { this.notificationId = notificationId; return this; }
+        public NotificationBuilder user(User user) { this.user = user; return this; }
+        public NotificationBuilder title(String title) { this.title = title; return this; }
+        public NotificationBuilder message(String message) { this.message = message; return this; }
+        public NotificationBuilder isRead(Boolean isRead) { this.isRead = isRead; return this; }
+        public NotificationBuilder isDeleted(Boolean isDeleted) { this.isDeleted = isDeleted; return this; }
+        public NotificationBuilder deletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; return this; }
+        public NotificationBuilder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
+        public NotificationBuilder updatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; return this; }
+
+        public Notification build() {
+            Notification n = new Notification();
+            n.notificationId = this.notificationId;
+            n.user = this.user;
+            n.title = this.title;
+            n.message = this.message;
+            n.isRead = this.isRead;
+            n.isDeleted = this.isDeleted;
+            n.deletedAt = this.deletedAt;
+            n.createdAt = this.createdAt;
+            n.updatedAt = this.updatedAt;
+            return n;
+        }
+    }
 }

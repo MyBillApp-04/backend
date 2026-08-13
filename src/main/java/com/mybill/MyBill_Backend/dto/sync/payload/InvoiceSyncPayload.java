@@ -13,6 +13,11 @@ public class InvoiceSyncPayload {
 
     private String id;
     private String clientId;
+    private String quotationId;
+
+    // Customer GST snapshot taken at invoice-creation time.
+    private String clientState;
+    private String clientGstin;
 
     private String invoiceNumber;
 
@@ -25,6 +30,17 @@ public class InvoiceSyncPayload {
     private Double totalAmount;
     private Double paidAmount;
     private Double pendingAmount;
+
+    // GST / Tax snapshot (invoice-level single rate). Ignored as trusted input;
+    // the server recomputes these authoritatively via TaxCalculator.
+    private Double taxRate;
+    private String taxType;
+    private Double taxableAmount;
+    private Double taxAmount;
+    private Double cgstAmount;
+    private Double sgstAmount;
+    private Double igstAmount;
+    private Double total;
 
     // Status & Modes (Using String to avoid Enum parsing crashes during sync)
     private String paymentStatus;

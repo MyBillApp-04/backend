@@ -192,12 +192,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
         // 2. User & Role based rate limiting
         if (userKey != null) {
             int limit = userLimitPerMinute; // Default: 300
-            try {
-                User user = securityUtils.getCurrentUser();
-                if (user != null && user.getRole() == Role.ADMIN) {
+            var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getAuthorities() != null) {
+                boolean isAdmin = auth.getAuthorities().stream()
+                        .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+                if (isAdmin) {
                     limit = 5000; // Admins get high throughput limits
                 }
-            } catch (Exception ignored) {}
+            }
 
             if (isExceeded(userKey, limit)) {
                 reject(response, "Too many requests. API rate limit quota exceeded for this account", "user");

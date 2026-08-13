@@ -79,6 +79,10 @@ public class InvoiceNumberService {
     public static String companyCode(String value) {
         if (value == null || value.isBlank()) return DEFAULT_COMPANY_CODE;
         String normalized = value.trim().toUpperCase();
+        while (normalized.endsWith("-")) {
+            normalized = normalized.substring(0, normalized.length() - 1).trim();
+        }
+        if (normalized.isBlank()) return DEFAULT_COMPANY_CODE;
         if (!normalized.matches("[A-Z0-9]{2,5}")) {
             throw new IllegalArgumentException("Company code must contain 2 to 5 letters or numbers");
         }

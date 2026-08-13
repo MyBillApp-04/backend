@@ -40,4 +40,25 @@ public class InvoiceFilterDTO {
     public boolean isMaxAmountGreaterThanOrEqualToMinAmount() {
         return minAmount == null || maxAmount == null || maxAmount >= minAmount;
     }
+
+    public String getQuery() { return query; }
+    public void setQuery(String query) { this.query = query; }
+
+    public UUID getClientId() { return clientId; }
+    public void setClientId(UUID clientId) { this.clientId = clientId; }
+
+    public LocalDateTime getStartDate() { return startDate; }
+    public void setStartDate(LocalDateTime startDate) { this.startDate = startDate; }
+
+    public LocalDateTime getEndDate() { return endDate; }
+    public void setEndDate(LocalDateTime endDate) { this.endDate = endDate; }
+
+    public List<PaymentStatus> getStatuses() { return statuses; }
+    public void setStatuses(List<PaymentStatus> statuses) { this.statuses = statuses; }
+
+    public Double getMinAmount() { return minAmount; }
+    public void setMinAmount(Double minAmount) { this.minAmount = minAmount; }
+
+    public Double getMaxAmount() { return maxAmount; }
+    public void setMaxAmount(Double maxAmount) { this.maxAmount = maxAmount; }
 }

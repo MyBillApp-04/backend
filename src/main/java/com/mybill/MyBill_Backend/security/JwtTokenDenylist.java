@@ -21,22 +21,15 @@ import java.util.HexFormat;
 
 /**
  * JWT token denylist backed by an in-memory L1 Caffeine cache and PostgreSQL persistent storage.
- *
- * <p>Tokens are denied when a user calls {@code /api/auth/logout}. Token hashes (SHA-256) are saved to
- * PostgreSQL to guarantee revocation persists across application restarts and across multi-instance clusters.
  */
 @Component
 @Slf4j
 public class JwtTokenDenylist {
-
     private final Cache<String, Boolean> deniedTokens;
     private final RevokedTokenRepository revokedTokenRepository;
 
     @Autowired
-    public JwtTokenDenylist(
-            @Value("${app.security.jwt-denylist.cache-max-size:10000}") long cacheMaxSize,
-            @Autowired(required = false) RevokedTokenRepository revokedTokenRepository
-    ) {
+    public JwtTokenDenylist(@Value("${app.security.jwt-denylist.cache-max-size:10000}") long cacheMaxSize, @Autowired(required = false) RevokedTokenRepository revokedTokenRepository) {
         this.deniedTokens = Caffeine.newBuilder()
                 .expireAfterWrite(Duration.ofHours(24))
                 .maximumSize(cacheMaxSize)

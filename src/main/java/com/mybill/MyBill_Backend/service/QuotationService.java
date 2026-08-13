@@ -5,6 +5,8 @@ import com.mybill.MyBill_Backend.dto.QuotationItemDTO;
 import com.mybill.MyBill_Backend.entity.*;
 import com.mybill.MyBill_Backend.exception.NotFoundException;
 import com.mybill.MyBill_Backend.repository.ClientRepository;
+import com.mybill.MyBill_Backend.repository.InvoiceItemRepository;
+import com.mybill.MyBill_Backend.repository.InvoiceRepository;
 import com.mybill.MyBill_Backend.repository.QuotationItemRepository;
 import com.mybill.MyBill_Backend.repository.QuotationRepository;
 import com.mybill.MyBill_Backend.util.SecurityUtils;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -27,6 +30,9 @@ public class QuotationService {
 
     private final QuotationRepository quotationRepository;
     private final QuotationItemRepository quotationItemRepository;
+    private final InvoiceRepository invoiceRepository;
+    private final InvoiceItemRepository invoiceItemRepository;
+    private final InvoiceNumberService invoiceNumberService;
     private final ClientRepository clientRepository;
     private final SecurityUtils securityUtils;
     private final EntityManager entityManager;
@@ -187,6 +193,101 @@ public class QuotationService {
             item.markDeleted(now);
             quotationItemRepository.save(item);
         }
+    }
+
+    @Transactional
+    public Invoice convertQuotationToInvoice(UUID id) {
+        Long userId = securityUtils.getCurrentUserId();
+        User user = securityUtils.getCurrentUser();
+
+        Quotation quotation = quotationRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new NotFoundException("Quotation not found"));
+
+        if (Boolean.TRUE.equals(quotation.getIsDeleted())) {
+            throw new NotFoundException("Quotation not found");
+        }
+
+        // Idempotency check: if invoice already exists for this quotation, return it
+        Optional<Invoice> existingInvoice = invoiceRepository.findByQuotationIdAndUserId(id, userId);
+        if (existingInvoice.isPresent()) {
+            if (quotation.getStatus() != QuotationStatus.CONVERTED) {
+                quotation.setStatus(QuotationStatus.CONVERTED);
+                quotationRepository.save(quotation);
+            }
+            return existingInvoice.get();
+        }
+
+        // Quotations must be ACCEPTED (or already CONVERTED) to be converted
+        if (quotation.getStatus() != QuotationStatus.ACCEPTED && quotation.getStatus() != QuotationStatus.CONVERTED) {
+            throw new IllegalStateException("Only ACCEPTED quotations can be converted to an invoice. Current status: " + quotation.getStatus());
+        }
+
+        InvoiceNumberService.InvoiceNumberResult numResult = invoiceNumberService.generateNextInvoiceNumber(userId, java.time.LocalDate.now());
+
+        LocalDateTime now = LocalDateTime.now();
+        Double totalAmount = roundMoney(quotation.getTotalAmount() != null ? quotation.getTotalAmount() : 0.0);
+
+        Invoice invoice = Invoice.builder()
+                .id(UUID.randomUUID())
+                .user(user)
+                .client(quotation.getClient())
+                .quotation(quotation)
+                .invoiceNumber(numResult.invoiceNumber())
+                .financialYear(numResult.financialYear())
+                .sequenceNo(numResult.sequenceNo())
+                .subtotal(roundMoney(quotation.getSubtotal() != null ? quotation.getSubtotal() : 0.0))
+                .discount(roundMoney(quotation.getDiscount() != null ? quotation.getDiscount() : 0.0))
+                .grossAmount(roundMoney(quotation.getGrossAmount() != null ? quotation.getGrossAmount() : 0.0))
+                .advanceApplied(0.0)
+                .netPayable(roundMoney(quotation.getNetPayable() != null ? quotation.getNetPayable() : 0.0))
+                .totalAmount(totalAmount)
+                .paidAmount(0.0)
+                .pendingAmount(totalAmount)
+                .remainingAmount(totalAmount)
+                .paymentStatus(PaymentStatus.UNPAID)
+                .notes(quotation.getNotes())
+                .createdDate(now)
+                .invoiceDate(now)
+                .dueDate(now.plusDays(numResult.defaultDueDays()))
+                .updatedAt(now)
+                .isDeleted(false)
+                .version(1)
+                .build();
+
+        Invoice savedInvoice = invoiceRepository.save(invoice);
+
+        List<QuotationItem> qItems = quotationItemRepository.findByQuotationIdAndUserIdAndIsDeletedFalse(id, userId);
+        List<InvoiceItem> invoiceItems = new ArrayList<>();
+        for (QuotationItem qi : qItems) {
+            int qty = qi.getQuantity() != null ? qi.getQuantity() : 1;
+            double amt = roundMoney(qi.getAmount() != null ? qi.getAmount() : 0.0);
+            double rate = qty > 0 ? roundMoney(amt / qty) : amt;
+
+            InvoiceItem ii = InvoiceItem.builder()
+                    .id(UUID.randomUUID())
+                    .invoice(savedInvoice)
+                    .user(user)
+                    .work(null)
+                    .description(qi.getDescription())
+                    .dimension(qi.getDimension())
+                    .kgs(qi.getKgs())
+                    .quantity(qty)
+                    .rate(rate)
+                    .amount(amt)
+                    .createdAt(now)
+                    .updatedAt(now)
+                    .isDeleted(false)
+                    .version(1)
+                    .build();
+            invoiceItems.add(invoiceItemRepository.save(ii));
+        }
+
+        savedInvoice.setItems(invoiceItems);
+
+        quotation.setStatus(QuotationStatus.CONVERTED);
+        quotationRepository.save(quotation);
+
+        return savedInvoice;
     }
 
     @Transactional

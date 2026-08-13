@@ -48,4 +48,57 @@ public class EntityChangeHistory {
         if (id == null) id = UUID.randomUUID();
         if (timestamp == null) timestamp = LocalDateTime.now();
     }
+
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+
+    public String getEntityName() { return entityName; }
+    public void setEntityName(String entityName) { this.entityName = entityName; }
+
+    public UUID getEntityId() { return entityId; }
+    public void setEntityId(UUID entityId) { this.entityId = entityId; }
+
+    public String getAction() { return action; }
+    public void setAction(String action) { this.action = action; }
+
+    public Long getChangedBy() { return changedBy; }
+    public void setChangedBy(Long changedBy) { this.changedBy = changedBy; }
+
+    public String getChangeDetails() { return changeDetails; }
+    public void setChangeDetails(String changeDetails) { this.changeDetails = changeDetails; }
+
+    public LocalDateTime getTimestamp() { return timestamp; }
+    public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
+
+    public static EntityChangeHistoryBuilder builder() { return new EntityChangeHistoryBuilder(); }
+
+    public static class EntityChangeHistoryBuilder {
+        private UUID id;
+        private String entityName;
+        private UUID entityId;
+        private String action;
+        private Long changedBy;
+        private String changeDetails;
+        private LocalDateTime timestamp;
+
+        public EntityChangeHistoryBuilder id(UUID id) { this.id = id; return this; }
+        public EntityChangeHistoryBuilder entityName(String entityName) { this.entityName = entityName; return this; }
+        public EntityChangeHistoryBuilder entityId(UUID entityId) { this.entityId = entityId; return this; }
+        public EntityChangeHistoryBuilder action(String action) { this.action = action; return this; }
+        public EntityChangeHistoryBuilder changedBy(Long changedBy) { this.changedBy = changedBy; return this; }
+        public EntityChangeHistoryBuilder changeDetails(String changeDetails) { this.changeDetails = changeDetails; return this; }
+        public EntityChangeHistoryBuilder timestamp(LocalDateTime timestamp) { this.timestamp = timestamp; return this; }
+
+        public EntityChangeHistory build() {
+            EntityChangeHistory h = new EntityChangeHistory();
+            h.id = this.id;
+            h.entityName = this.entityName;
+            h.entityId = this.entityId;
+            h.action = this.action;
+            h.changedBy = this.changedBy;
+            h.changeDetails = this.changeDetails;
+            h.timestamp = this.timestamp;
+            return h;
+        }
+    }
 }

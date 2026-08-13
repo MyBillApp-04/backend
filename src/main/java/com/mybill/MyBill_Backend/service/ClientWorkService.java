@@ -17,9 +17,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
+
+import com.mybill.MyBill_Backend.entity.InvoiceItem;
 
 import java.time.*;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -51,8 +56,10 @@ public class ClientWorkService {
     public Page<ClientWorkDTO> getAllWork(Pageable pageable) {
         Long userId = securityUtils.getCurrentUserId();
 
-        return workRepository.findAllByUserIdOrderByDateDesc(userId, boundedPageable(pageable))
-                .map(this::convertToDTO);
+        return convertPageToDTOPage(
+                workRepository.findAllByUserIdOrderByDateDesc(userId, boundedPageable(pageable)),
+                userId
+        );
     }
 
     @Transactional(readOnly = true)
@@ -62,11 +69,13 @@ public class ClientWorkService {
         clientRepository.findByIdAndUserId(clientId, userId)
                 .orElseThrow(() -> new ForbiddenException("Client not found or access denied"));
 
-        return workRepository
-                .findByClientIdAndBilledFalseAndUserIdAndIsDeletedFalse(clientId, userId, boundedPageable(pageable))
-                .map(this::convertToDTO);
+        return convertPageToDTOPage(
+                workRepository.findByClientIdAndBilledFalseAndUserIdAndIsDeletedFalse(clientId, userId, boundedPageable(pageable)),
+                userId
+        );
     }
 
+    @CacheEvict(value = "dashboardStats", allEntries = true)
     public ClientWork addWork(UUID clientId, ClientWorkRequest request) {
         Long userId = securityUtils.getCurrentUserId();
 
@@ -99,6 +108,7 @@ public class ClientWorkService {
         return workRepository.save(work);
     }
 
+    @CacheEvict(value = "dashboardStats", allEntries = true)
     public ClientWork updateWork(UUID workId, ClientWorkRequest request) {
         Long userId = securityUtils.getCurrentUserId();
 
@@ -127,6 +137,7 @@ public class ClientWorkService {
         return workRepository.save(existing);
     }
 
+    @CacheEvict(value = "dashboardStats", allEntries = true)
     public void deleteWork(UUID workId) {
         Long userId = securityUtils.getCurrentUserId();
 
@@ -148,16 +159,50 @@ public class ClientWorkService {
     }
 
     @Transactional(readOnly = true)
-    public List<ClientSummaryProjection> getClientSummary() {
-        return workRepository.getClientSummaryForUser(securityUtils.getCurrentUserId());
+    public Page<ClientSummaryProjection> getClientSummary(Pageable pageable) {
+        return workRepository.getClientSummaryForUser(securityUtils.getCurrentUserId(), boundedPageable(pageable));
     }
 
     @Transactional(readOnly = true)
     public Page<ClientWorkDTO> getWorkUpdatedSince(LocalDateTime since, Pageable pageable) {
         Long userId = securityUtils.getCurrentUserId();
 
-        return workRepository.findByUserIdAndUpdatedAtAfter(userId, since, boundedPageable(pageable))
-                .map(this::convertToDTO);
+        return convertPageToDTOPage(
+                workRepository.findByUserIdAndUpdatedAtAfter(userId, since, boundedPageable(pageable)),
+                userId
+        );
+    }
+
+    private Page<ClientWorkDTO> convertPageToDTOPage(Page<ClientWork> page, Long userId) {
+        if (page.isEmpty()) {
+            return page.map(this::convertToDTO);
+        }
+
+        List<UUID> workIds = page.getContent().stream().map(ClientWork::getId).toList();
+        List<InvoiceItem> items = invoiceItemRepository.findByWorkIdInAndUserIdAndIsDeletedFalse(workIds, userId);
+
+        Map<UUID, InvoiceItem> latestInvoiceItems = new HashMap<>();
+        for (InvoiceItem item : items) {
+            if (item.getWork() == null) continue;
+            UUID wId = item.getWork().getId();
+            InvoiceItem existing = latestInvoiceItems.get(wId);
+            if (existing == null || isNewer(item, existing)) {
+                latestInvoiceItems.put(wId, item);
+            }
+        }
+
+        return page.map(work -> convertToDTO(work, latestInvoiceItems.get(work.getId())));
+    }
+
+    private boolean isNewer(InvoiceItem a, InvoiceItem b) {
+        LocalDateTime dateA = a.getInvoice() != null ? a.getInvoice().getInvoiceDate() : null;
+        LocalDateTime dateB = b.getInvoice() != null ? b.getInvoice().getInvoiceDate() : null;
+        if (dateA != null && dateB != null && !dateA.equals(dateB)) {
+            return dateA.isAfter(dateB);
+        }
+        LocalDateTime createdA = a.getCreatedAt() != null ? a.getCreatedAt() : LocalDateTime.MIN;
+        LocalDateTime createdB = b.getCreatedAt() != null ? b.getCreatedAt() : LocalDateTime.MIN;
+        return createdA.isAfter(createdB);
     }
 
     private Pageable boundedPageable(Pageable pageable) {
@@ -181,6 +226,10 @@ public class ClientWorkService {
                 )
                 .orElse(null);
 
+        return convertToDTO(work, lastInvoiceItem);
+    }
+
+    private ClientWorkDTO convertToDTO(ClientWork work, InvoiceItem lastInvoiceItem) {
         return ClientWorkDTO.builder()
                 .id(work.getId())
                 .description(work.getDescription())

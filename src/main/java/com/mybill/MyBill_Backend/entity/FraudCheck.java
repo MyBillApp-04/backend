@@ -58,4 +58,61 @@ public class FraudCheck {
         if (id == null) id = UUID.randomUUID();
         if (createdAt == null) createdAt = LocalDateTime.now();
     }
+
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+    public Payment getPayment() { return payment; }
+    public void setPayment(Payment payment) { this.payment = payment; }
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+    public Double getScore() { return score; }
+    public void setScore(Double score) { this.score = score; }
+    public FraudStatus getStatus() { return status; }
+    public void setStatus(FraudStatus status) { this.status = status; }
+    public String getRulesTriggered() { return rulesTriggered; }
+    public void setRulesTriggered(String rulesTriggered) { this.rulesTriggered = rulesTriggered; }
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public Long getCreatedBy() { return createdBy; }
+    public void setCreatedBy(Long createdBy) { this.createdBy = createdBy; }
+
+    public static FraudCheckBuilder builder() { return new FraudCheckBuilder(); }
+
+    public static class FraudCheckBuilder {
+        private UUID id;
+        private Payment payment;
+        private User user;
+        private Double score;
+        private FraudStatus status;
+        private String rulesTriggered;
+        private String notes;
+        private LocalDateTime createdAt;
+        private Long createdBy;
+
+        public FraudCheckBuilder id(UUID id) { this.id = id; return this; }
+        public FraudCheckBuilder payment(Payment payment) { this.payment = payment; return this; }
+        public FraudCheckBuilder user(User user) { this.user = user; return this; }
+        public FraudCheckBuilder score(Double score) { this.score = score; return this; }
+        public FraudCheckBuilder status(FraudStatus status) { this.status = status; return this; }
+        public FraudCheckBuilder rulesTriggered(String rulesTriggered) { this.rulesTriggered = rulesTriggered; return this; }
+        public FraudCheckBuilder notes(String notes) { this.notes = notes; return this; }
+        public FraudCheckBuilder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
+        public FraudCheckBuilder createdBy(Long createdBy) { this.createdBy = createdBy; return this; }
+
+        public FraudCheck build() {
+            FraudCheck f = new FraudCheck();
+            f.id = this.id;
+            f.payment = this.payment;
+            f.user = this.user;
+            f.score = this.score;
+            f.status = this.status;
+            f.rulesTriggered = this.rulesTriggered;
+            f.notes = this.notes;
+            f.createdAt = this.createdAt;
+            f.createdBy = this.createdBy;
+            return f;
+        }
+    }
 }

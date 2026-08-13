@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -26,6 +27,7 @@ public class ClientService {
     private final SecurityUtils securityUtils;
     private final AuditTrailService auditTrailService;
 
+    @CacheEvict(value = "dashboardStats", allEntries = true)
     public Client createClient(Client client) {
         if (client.getId() == null) {
             client.setId(UUID.randomUUID());
@@ -67,6 +69,7 @@ public class ClientService {
                 .orElseThrow(() -> new AccessDeniedException("Client not found or access denied"));
     }
 
+    @CacheEvict(value = "dashboardStats", allEntries = true)
     public Client updateClient(UUID id, Client updatedClient) {
         Client client = getClientById(id);
 
@@ -74,6 +77,8 @@ public class ClientService {
         client.setPhone(updatedClient.getPhone());
         client.setEmail(updatedClient.getEmail());
         client.setAddress(updatedClient.getAddress());
+        client.setState(updatedClient.getState());
+        client.setGstin(updatedClient.getGstin());
         client.setDeviceId(updatedClient.getDeviceId());
 
         if (updatedClient.getUpdatedAt() != null &&
@@ -86,6 +91,7 @@ public class ClientService {
         return savedClient;
     }
 
+    @CacheEvict(value = "dashboardStats", allEntries = true)
     public void deleteClient(UUID id) {
         Client client = getClientById(id);
         client.markDeleted(LocalDateTime.now());

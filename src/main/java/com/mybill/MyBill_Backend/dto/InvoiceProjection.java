@@ -1,6 +1,7 @@
 package com.mybill.MyBill_Backend.dto;
 
 import com.mybill.MyBill_Backend.entity.PaymentStatus;
+import com.mybill.MyBill_Backend.entity.TaxType;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -11,6 +12,14 @@ public interface InvoiceProjection {
     Double getSubtotal();
     Double getDiscount();
     Double getGrossAmount();
+    Double getTaxRate();
+    TaxType getTaxType();
+    Double getTaxableAmount();
+    Double getTaxAmount();
+    Double getCgstAmount();
+    Double getSgstAmount();
+    Double getIgstAmount();
+    Double getTotal();
     Double getAdvanceApplied();
     Double getNetPayable();
     Double getTotalAmount();

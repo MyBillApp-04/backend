@@ -13,5 +13,12 @@ services:
         value: "https://mybill-app-04.firebaseapp.com,https://mybill-app-04.web.app,https://mybill-backend-vckc.onrender.com,http://localhost:*,http://127.0.0.1:*,http://[::1]:*"
       - key: PUBLIC_BASE_URL
         value: "https://mybill-backend-vckc.onrender.com"
+      - key: SCHEDULING_ENABLED
+        # Enable scheduled maintenance, recurring invoices and the async job
+        # poller. The poll interval is tuned to 60s to keep CPU/DB load modest
+        # on the free tier while still processing retries promptly.
+        value: "true"
+      - key: ASYNC_JOBS_POLL_INTERVAL_MS
+        value: "60000"
       - key: JAVA_TOOL_OPTIONS
         value: "-Xms64m -Xmx256m -XX:+UseContainerSupport -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=48m -XX:MaxDirectMemorySize=32m -Xss512k -XX:ActiveProcessorCount=1 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xlog:gc*,safepoint:file=/tmp/mybill-gc.log:time,uptime,level,tags:filecount=3,filesize=5M -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/urandom"

@@ -23,6 +23,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AsyncJobAdminController {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AsyncJobAdminController.class);
+
     private final AsyncJobRepository asyncJobRepository;
 
     @Value("${app.async-jobs.dlq-alert-threshold:10}")

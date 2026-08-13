@@ -15,9 +15,15 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.context.ApplicationEventPublisher;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.ConcurrentModificationException;
@@ -133,6 +139,99 @@ class ClientFinancialServiceTest {
         double applied = clientFinancialService.applyAdvanceToInvoice(invoice, 100.00, LocalDateTime.now());
 
         assertThat(applied).isEqualTo(100.00);
+        verify(databaseLockService).tryLock(clientId.getMostSignificantBits());
+        verify(databaseLockService).unlock(clientId.getMostSignificantBits());
+    }
+
+    @Test
+    void deleteAdvanceAcquiresLockAndCreatesReversingAdjustment() {
+        when(databaseLockService.tryLock(anyLong())).thenReturn(true);
+        when(clientRepository.findByIdAndUserIdAndIsDeletedFalseWithLock(clientId, userId))
+                .thenReturn(Optional.of(client));
+
+        UUID entryId = UUID.randomUUID();
+        ClientLedgerEntry advanceEntry = ClientLedgerEntry.builder()
+                .id(entryId)
+                .client(client)
+                .user(user)
+                .type(LedgerEntryType.ADVANCE_RECEIVED)
+                .direction(LedgerDirection.CREDIT)
+                .amount(100.00)
+                .transactionDate(LocalDateTime.now().minusDays(1))
+                .isDeleted(false)
+                .build();
+
+        when(ledgerRepository.findByIdAndUserId(entryId, userId)).thenReturn(Optional.of(advanceEntry));
+        when(ledgerRepository.findByClientIdAndUserIdAndIsDeletedFalseOrderByTransactionDateDesc(clientId, userId, Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(Collections.emptyList()));
+        when(ledgerRepository.getAdvanceBalance(clientId, userId)).thenReturn(100.00);
+
+        clientFinancialService.deleteAdvance(clientId, entryId);
+
+        assertThat(advanceEntry.getIsDeleted()).isTrue();
+        verify(ledgerRepository).save(advanceEntry);
+        verify(databaseLockService).tryLock(clientId.getMostSignificantBits());
+        verify(databaseLockService).unlock(clientId.getMostSignificantBits());
+    }
+
+    @Test
+    void deleteAdvanceRejectsAlreadyAppliedAdvance() {
+        when(databaseLockService.tryLock(anyLong())).thenReturn(true);
+        when(clientRepository.findByIdAndUserIdAndIsDeletedFalseWithLock(clientId, userId))
+                .thenReturn(Optional.of(client));
+
+        UUID entryId = UUID.randomUUID();
+        LocalDateTime advanceDate = LocalDateTime.now().minusDays(2);
+        ClientLedgerEntry advanceEntry = ClientLedgerEntry.builder()
+                .id(entryId)
+                .client(client)
+                .user(user)
+                .type(LedgerEntryType.ADVANCE_RECEIVED)
+                .direction(LedgerDirection.CREDIT)
+                .amount(100.00)
+                .transactionDate(advanceDate)
+                .isDeleted(false)
+                .build();
+
+        ClientLedgerEntry applied = ClientLedgerEntry.builder()
+                .id(UUID.randomUUID())
+                .client(client)
+                .user(user)
+                .type(LedgerEntryType.ADVANCE_APPLIED)
+                .direction(LedgerDirection.CREDIT)
+                .amount(60.00)
+                .invoice(Invoice.builder().id(UUID.randomUUID()).client(client).user(user).build())
+                .transactionDate(advanceDate.plusDays(1))
+                .isDeleted(false)
+                .build();
+
+        when(ledgerRepository.findByIdAndUserId(entryId, userId)).thenReturn(Optional.of(advanceEntry));
+        when(ledgerRepository.findByClientIdAndUserIdAndIsDeletedFalseOrderByTransactionDateDesc(clientId, userId, Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of(applied)));
+        when(ledgerRepository.getAdvanceBalance(clientId, userId)).thenReturn(40.00);
+
+        assertThatThrownBy(() -> clientFinancialService.deleteAdvance(clientId, entryId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cannot delete advance that has been applied");
+
+        verify(databaseLockService).unlock(clientId.getMostSignificantBits());
+        verify(ledgerRepository, never()).save(advanceEntry);
+    }
+
+    @Test
+    void releaseAdvanceFromInvoiceCreditsAdvanceBack() {
+        when(databaseLockService.tryLock(anyLong())).thenReturn(true);
+        when(clientRepository.findByIdAndUserIdAndIsDeletedFalseWithLock(clientId, userId))
+                .thenReturn(Optional.of(client));
+        when(ledgerRepository.getAdvanceBalance(clientId, userId)).thenReturn(40.00);
+
+        clientFinancialService.releaseAdvanceFromInvoice(clientId, userId, 60.00, LocalDateTime.now(), "INV-CANCEL-01");
+
+        verify(ledgerRepository).save(argThat(entry ->
+                entry.getType() == LedgerEntryType.ADVANCE_APPLIED
+                        && entry.getDirection() == LedgerDirection.DEBIT
+                        && entry.getAmount().equals(60.00)
+                        && entry.getBalanceAfter().equals(100.00)));
         verify(databaseLockService).tryLock(clientId.getMostSignificantBits());
         verify(databaseLockService).unlock(clientId.getMostSignificantBits());
     }

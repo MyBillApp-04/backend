@@ -158,4 +158,110 @@ public class ClientWork {
         this.deletedAt = timestamp;
         this.updatedAt = timestamp;
     }
+
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public Double getRate() { return rate; }
+    public void setRate(Double rate) { this.rate = rate; }
+    public Integer getQuantity() { return quantity; }
+    public void setQuantity(Integer quantity) { this.quantity = quantity; }
+    public Double getAmount() { return amount; }
+    public void setAmount(Double amount) { this.amount = amount; }
+    public LocalDateTime getDate() { return date; }
+    public void setDate(LocalDateTime date) { this.date = date; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
+    public Boolean getBilled() { return billed; }
+    public void setBilled(Boolean billed) { this.billed = billed; }
+    public Boolean getIsDeleted() { return isDeleted; }
+    public void setIsDeleted(Boolean isDeleted) { this.isDeleted = isDeleted; }
+    public String getPreviousInvoiceNumber() { return previousInvoiceNumber; }
+    public void setPreviousInvoiceNumber(String previousInvoiceNumber) { this.previousInvoiceNumber = previousInvoiceNumber; }
+    public LocalDateTime getLastBilledDate() { return lastBilledDate; }
+    public void setLastBilledDate(LocalDateTime lastBilledDate) { this.lastBilledDate = lastBilledDate; }
+    public String getDeviceId() { return deviceId; }
+    public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
+    public Integer getVersion() { return version; }
+    public void setVersion(Integer version) { this.version = version; }
+    public Long getCreatedBy() { return createdBy; }
+    public void setCreatedBy(Long createdBy) { this.createdBy = createdBy; }
+    public Long getUpdatedBy() { return updatedBy; }
+    public void setUpdatedBy(Long updatedBy) { this.updatedBy = updatedBy; }
+    public Client getClient() { return client; }
+    public void setClient(Client client) { this.client = client; }
+    public Invoice getInvoice() { return invoice; }
+    public void setInvoice(Invoice invoice) { this.invoice = invoice; }
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+
+    public static ClientWorkBuilder builder() { return new ClientWorkBuilder(); }
+
+    public static class ClientWorkBuilder {
+        private UUID id;
+        private Client client;
+        private Invoice invoice;
+        private User user;
+        private String description;
+        private Double rate;
+        private Integer quantity;
+        private Double amount;
+        private LocalDateTime date;
+        private LocalDateTime createdAt;
+        private LocalDateTime updatedAt;
+        private LocalDateTime deletedAt;
+        private Boolean billed = false;
+        private Boolean isDeleted = false;
+        private String previousInvoiceNumber;
+        private LocalDateTime lastBilledDate;
+        private String deviceId;
+        private Integer version = 1;
+
+        public ClientWorkBuilder id(UUID id) { this.id = id; return this; }
+        public ClientWorkBuilder client(Client client) { this.client = client; return this; }
+        public ClientWorkBuilder invoice(Invoice invoice) { this.invoice = invoice; return this; }
+        public ClientWorkBuilder user(User user) { this.user = user; return this; }
+        public ClientWorkBuilder description(String description) { this.description = description; return this; }
+        public ClientWorkBuilder rate(Double rate) { this.rate = rate; return this; }
+        public ClientWorkBuilder quantity(Integer quantity) { this.quantity = quantity; return this; }
+        public ClientWorkBuilder amount(Double amount) { this.amount = amount; return this; }
+        public ClientWorkBuilder date(LocalDateTime date) { this.date = date; return this; }
+        public ClientWorkBuilder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
+        public ClientWorkBuilder updatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; return this; }
+        public ClientWorkBuilder deletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; return this; }
+        public ClientWorkBuilder billed(Boolean billed) { this.billed = billed; return this; }
+        public ClientWorkBuilder isDeleted(Boolean isDeleted) { this.isDeleted = isDeleted; return this; }
+        public ClientWorkBuilder previousInvoiceNumber(String previousInvoiceNumber) { this.previousInvoiceNumber = previousInvoiceNumber; return this; }
+        public ClientWorkBuilder lastBilledDate(LocalDateTime lastBilledDate) { this.lastBilledDate = lastBilledDate; return this; }
+        public ClientWorkBuilder deviceId(String deviceId) { this.deviceId = deviceId; return this; }
+        public ClientWorkBuilder version(Integer version) { this.version = version; return this; }
+
+        public ClientWork build() {
+            ClientWork work = new ClientWork();
+            work.id = this.id;
+            work.client = this.client;
+            work.invoice = this.invoice;
+            work.user = this.user;
+            work.description = this.description;
+            work.rate = this.rate;
+            work.quantity = this.quantity;
+            work.amount = this.amount;
+            work.date = this.date;
+            work.createdAt = this.createdAt;
+            work.updatedAt = this.updatedAt;
+            work.deletedAt = this.deletedAt;
+            work.billed = this.billed;
+            work.isDeleted = this.isDeleted;
+            work.previousInvoiceNumber = this.previousInvoiceNumber;
+            work.lastBilledDate = this.lastBilledDate;
+            work.deviceId = this.deviceId;
+            work.version = this.version;
+            return work;
+        }
+    }
 }

@@ -6,11 +6,13 @@ import java.util.UUID;
 
 public class ClientResponse {
 
-    private UUID id;
+private UUID id;
     private String name;
     private String phone;
     private String email;
     private String address;
+    private String state;
+    private String gstin;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;
@@ -23,7 +25,9 @@ public class ClientResponse {
         this.name = client.getName() != null ? client.getName() : "";
         this.phone = client.getPhone() != null ? client.getPhone() : "";
         this.email = client.getEmail() != null ? client.getEmail() : "";
-        this.address = client.getAddress() != null ? client.getAddress() : "";
+this.address = client.getAddress() != null ? client.getAddress() : "";
+        this.state = client.getState() != null ? client.getState() : "";
+        this.gstin = client.getGstin() != null ? client.getGstin() : "";
         this.createdAt = client.getCreatedAt();
         this.updatedAt = client.getUpdatedAt();
         this.deletedAt = client.getDeletedAt();
@@ -38,7 +42,9 @@ public class ClientResponse {
         this.name = projection.getName() != null ? projection.getName() : "";
         this.phone = projection.getPhone() != null ? projection.getPhone() : "";
         this.email = projection.getEmail() != null ? projection.getEmail() : "";
-        this.address = projection.getAddress() != null ? projection.getAddress() : "";
+this.address = projection.getAddress() != null ? projection.getAddress() : "";
+        this.state = projection.getState() != null ? projection.getState() : "";
+        this.gstin = projection.getGstin() != null ? projection.getGstin() : "";
         this.createdAt = projection.getCreatedAt();
         this.updatedAt = projection.getUpdatedAt();
         this.deletedAt = projection.getDeletedAt();
@@ -58,6 +64,10 @@ public class ClientResponse {
     public void setEmail(String email) { this.email = email; }
     public String getAddress() { return address; }
     public void setAddress(String address) { this.address = address; }
+    public String getState() { return state; }
+    public void setState(String state) { this.state = state; }
+    public String getGstin() { return gstin; }
+    public void setGstin(String gstin) { this.gstin = gstin; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

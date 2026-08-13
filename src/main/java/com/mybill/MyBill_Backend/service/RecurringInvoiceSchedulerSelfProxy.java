@@ -20,7 +20,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class RecurringInvoiceSchedulerSelfProxy {
-
     private final RecurringInvoiceScheduleRepository scheduleRepository;
     private final ClientWorkRepository workRepository;
     private final InvoiceService invoiceService;
@@ -56,6 +55,8 @@ public class RecurringInvoiceSchedulerSelfProxy {
                 0.0,
                 schedule.getDescription(),
                 now.plusDays(30), // standard due date in 30 days
+                null,             // no GST for auto-generated recurring invoices
+                null,
                 schedule.getUser().getId()
         );
 

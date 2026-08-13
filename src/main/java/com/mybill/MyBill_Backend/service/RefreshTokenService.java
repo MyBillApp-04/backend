@@ -79,6 +79,16 @@ public class RefreshTokenService {
                 .ifPresent(token -> token.setRevokedAt(Instant.now()));
     }
 
+    /**
+     * Revokes every active refresh token for the given user. Called on logout so a
+     * session cannot be resumed later, regardless of which token the client presents.
+     */
+    @Transactional
+    public void revokeAllForUser(Long userId) {
+        if (userId == null) return;
+        refreshTokenRepository.revokeAllByUserId(userId, Instant.now());
+    }
+
     private String hash(String token) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")

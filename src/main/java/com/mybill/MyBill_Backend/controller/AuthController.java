@@ -35,6 +35,7 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final JwtTokenDenylist tokenDenylist;
     private final RefreshTokenService refreshTokenService;
+    private final com.mybill.MyBill_Backend.util.SecurityUtils securityUtils;
 
     @PostMapping("/firebase-login")
     public ResponseEntity<?> firebaseLogin(
@@ -130,7 +131,14 @@ public class AuthController {
         if (token != null && jwtUtil.validateToken(token)) {
             tokenDenylist.deny(token, jwtUtil.extractExpiration(token));
         }
+        // Revoke the presented refresh token (if supplied) and, for the authenticated
+        // user, all other active refresh tokens so the session cannot be resumed.
         refreshTokenService.revoke(request.getHeader("X-Refresh-Token"));
+        try {
+            refreshTokenService.revokeAllForUser(securityUtils.getCurrentUserId());
+        } catch (RuntimeException ignored) {
+            // No authenticated principal (e.g. already-invalid access token); nothing to revoke.
+        }
         return ResponseEntity.ok(Map.of("message", "Logged out"));
     }
 

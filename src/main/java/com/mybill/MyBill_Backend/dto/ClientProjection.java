@@ -8,7 +8,9 @@ public interface ClientProjection {
     String getName();
     String getPhone();
     String getEmail();
-    String getAddress();
+String getAddress();
+    String getState();
+    String getGstin();
     LocalDateTime getCreatedAt();
     LocalDateTime getUpdatedAt();
     LocalDateTime getDeletedAt();

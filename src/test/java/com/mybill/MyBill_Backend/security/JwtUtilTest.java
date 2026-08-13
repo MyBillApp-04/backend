@@ -37,8 +37,10 @@ class JwtUtilTest {
     @Test
     void rejectsTamperedSignature() {
         String token = jwtUtil.generateToken("owner@example.com", Role.OWNER);
-        char replacement = token.endsWith("a") ? 'b' : 'a';
-        String tampered = token.substring(0, token.length() - 1) + replacement;
+        int targetIdx = token.length() - 5;
+        char original = token.charAt(targetIdx);
+        char replacement = original == 'a' ? 'b' : 'a';
+        String tampered = token.substring(0, targetIdx) + replacement + token.substring(targetIdx + 1);
 
         assertThat(jwtUtil.validateToken(tampered)).isFalse();
     }

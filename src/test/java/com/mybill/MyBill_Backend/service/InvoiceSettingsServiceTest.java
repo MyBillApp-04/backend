@@ -58,6 +58,9 @@ class InvoiceSettingsServiceTest {
         assertThat(defaults.getThemeColor()).isEqualTo("#225378");
         assertThat(defaults.getFontFamily()).isEqualTo("HELVETICA");
         assertThat(defaults.getShowLogo()).isTrue();
+        assertThat(defaults.getQuotationPrefix()).isEqualTo("QT");
+        assertThat(defaults.getNextQuotationNumber()).isEqualTo(1);
+        assertThat(defaults.getDefaultQuotationValidityDays()).isEqualTo(30);
     }
 
     @Test
@@ -84,6 +87,42 @@ class InvoiceSettingsServiceTest {
         assertThat(saved.getShowLogo()).isTrue();
         assertThat(saved.getTaxIdLabel()).isEqualTo("gstin");
         assertThat(saved.getTaxIdValue()).isEqualTo("27ABCDE1234F1Z5");
+    }
+
+    @Test
+    void normalizesQuotationDocumentSettingsWhenSaving() {
+        InvoiceSettings existing = InvoiceSettings.builder().user(testUser).build();
+        InvoiceSettingsRequest incoming = new InvoiceSettingsRequest();
+        incoming.setQuotationPrefix("qte");
+        incoming.setNextQuotationNumber(9);
+        incoming.setDefaultQuotationValidityDays(60);
+
+        when(repository.findByUserId(42L)).thenReturn(Optional.of(existing));
+        when(repository.save(existing)).thenReturn(existing);
+
+        InvoiceSettings saved = service.saveOrUpdateSettings(incoming);
+
+        assertThat(saved.getQuotationPrefix()).isEqualTo("QTE");
+        assertThat(saved.getNextQuotationNumber()).isEqualTo(9);
+        assertThat(saved.getDefaultQuotationValidityDays()).isEqualTo(60);
+    }
+
+    @Test
+    void fallsBackToQuotationDefaultsForInvalidOrBlankInputs() {
+        InvoiceSettings existing = InvoiceSettings.builder().user(testUser).build();
+        InvoiceSettingsRequest incoming = new InvoiceSettingsRequest();
+        incoming.setQuotationPrefix("bad!!prefix");
+        incoming.setNextQuotationNumber(null);
+        incoming.setDefaultQuotationValidityDays(null);
+
+        when(repository.findByUserId(42L)).thenReturn(Optional.of(existing));
+        when(repository.save(existing)).thenReturn(existing);
+
+        InvoiceSettings saved = service.saveOrUpdateSettings(incoming);
+
+        assertThat(saved.getQuotationPrefix()).isEqualTo("QT");
+        assertThat(saved.getNextQuotationNumber()).isEqualTo(1);
+        assertThat(saved.getDefaultQuotationValidityDays()).isEqualTo(30);
     }
 
     @Test

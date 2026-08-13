@@ -53,8 +53,8 @@ public class ClientWorkController {
     }
 
     @GetMapping("/summary")
-    public List<ClientSummaryProjection> getClientSummary() {
-        return workService.getClientSummary();
+    public Page<ClientSummaryProjection> getClientSummary(Pageable pageable) {
+        return workService.getClientSummary(pageable);
     }
 
     @PutMapping("/{workId}")

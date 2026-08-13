@@ -17,13 +17,25 @@ public class CacheConfig {
             @Value("${app.cache.dashboard.ttl-minutes:5}") long dashboardTtlMinutes,
             @Value("${app.cache.dashboard.max-size:100}") long dashboardMaxSize,
             @Value("${app.cache.business-profiles.max-size:100}") long businessProfilesMaxSize,
-            @Value("${app.cache.invoice-settings.max-size:100}") long invoiceSettingsMaxSize
+            @Value("${app.cache.invoice-settings.max-size:100}") long invoiceSettingsMaxSize,
+            @Value("${app.cache.client-financial.max-size:200}") long clientFinancialMaxSize,
+            @Value("${app.cache.invoice-projections.max-size:500}") long invoiceProjectionsMaxSize
     ) {
         CaffeineCacheManager manager = new CaffeineCacheManager();
 
         manager.registerCustomCache("dashboardStats", Caffeine.newBuilder()
                 .maximumSize(dashboardMaxSize)
                 .expireAfterWrite(Duration.ofMinutes(dashboardTtlMinutes))
+                .build());
+
+        manager.registerCustomCache("clientFinancialSummary", Caffeine.newBuilder()
+                .maximumSize(clientFinancialMaxSize)
+                .expireAfterWrite(Duration.ofMinutes(10))
+                .build());
+
+        manager.registerCustomCache("invoiceProjections", Caffeine.newBuilder()
+                .maximumSize(invoiceProjectionsMaxSize)
+                .expireAfterWrite(Duration.ofMinutes(5))
                 .build());
 
         manager.registerCustomCache("businessProfiles", Caffeine.newBuilder()

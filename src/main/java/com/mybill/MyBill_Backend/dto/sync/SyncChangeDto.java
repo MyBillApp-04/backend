@@ -32,4 +32,22 @@ public class SyncChangeDto {
 
     @NotNull(message = "Change creation time is required")
     private LocalDateTime createdAt;
+
+    public String getChangeId() { return changeId; }
+    public void setChangeId(String changeId) { this.changeId = changeId; }
+
+    public String getEntityType() { return entityType; }
+    public void setEntityType(String entityType) { this.entityType = entityType; }
+
+    public String getEntityId() { return entityId; }
+    public void setEntityId(String entityId) { this.entityId = entityId; }
+
+    public String getOperation() { return operation; }
+    public void setOperation(String operation) { this.operation = operation; }
+
+    public Map<String, Object> getPayload() { return payload; }
+    public void setPayload(Map<String, Object> payload) { this.payload = payload; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

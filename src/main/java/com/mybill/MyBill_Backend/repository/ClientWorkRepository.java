@@ -27,6 +27,7 @@ public interface ClientWorkRepository extends JpaRepository<ClientWork, UUID> {
 
     List<ClientWork> findByClientIdAndBilledFalseAndUserIdAndIsDeletedFalse(UUID clientId, Long userId);
 
+    @EntityGraph(attributePaths = {"client"})
     Page<ClientWork> findByClientIdAndBilledFalseAndUserIdAndIsDeletedFalse(UUID clientId, Long userId, Pageable pageable);
 
     List<ClientWork> findByInvoiceIdAndUserId(UUID invoiceId, Long userId);
@@ -39,6 +40,7 @@ public interface ClientWorkRepository extends JpaRepository<ClientWork, UUID> {
            """)
     List<ClientWork> findAllByUserIdOrderByDateDesc(@Param("userId") Long userId);
 
+    @EntityGraph(attributePaths = {"client"})
     @Query("""
            SELECT w FROM ClientWork w
            WHERE w.user.id = :userId
@@ -76,7 +78,7 @@ public interface ClientWorkRepository extends JpaRepository<ClientWork, UUID> {
              AND c.isDeleted = false
            GROUP BY c.id, c.name
            """)
-    List<ClientSummaryProjection> getClientSummaryForUser(@Param("userId") Long userId);
+    Page<ClientSummaryProjection> getClientSummaryForUser(@Param("userId") Long userId, Pageable pageable);
 
     @Query("""
            SELECT COALESCE(SUM(w.amount), 0.0)
@@ -113,6 +115,7 @@ public interface ClientWorkRepository extends JpaRepository<ClientWork, UUID> {
             Pageable pageable
     );
 
+    @EntityGraph(attributePaths = {"client"})
     @Query("""
            SELECT w
            FROM ClientWork w

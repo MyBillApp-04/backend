@@ -4,6 +4,8 @@ import com.mybill.MyBill_Backend.dto.ClientRequest;
 import com.mybill.MyBill_Backend.dto.ExpenseDTO;
 import com.mybill.MyBill_Backend.dto.InvoiceFilterDTO;
 import com.mybill.MyBill_Backend.dto.InvoiceRequest;
+import com.mybill.MyBill_Backend.dto.QuotationDTO;
+import com.mybill.MyBill_Backend.dto.QuotationItemDTO;
 import com.mybill.MyBill_Backend.dto.RecurringInvoiceScheduleDTO;
 import com.mybill.MyBill_Backend.dto.sync.SyncChangeDto;
 import com.mybill.MyBill_Backend.dto.sync.SyncRequest;
@@ -48,7 +50,7 @@ class ValidationTest {
     @ParameterizedTest
     @ValueSource(strings = {
             "Rahul Sharma",
-            "Acme Traders",
+            "Ajay Yadav",
             "A & B Services",
             "Client-42",
             "O'Connor Associates",
@@ -428,9 +430,9 @@ class ValidationTest {
 
     private static ClientRequest validClientRequest() {
         ClientRequest request = new ClientRequest();
-        request.setName("Acme Traders");
+        request.setName("Ajay Yadav");
         request.setPhone("9876543210");
-        request.setEmail("client@example.com");
+        request.setEmail("ajay@example.com");
         request.setAddress("Main Road");
         return request;
     }
@@ -495,7 +497,7 @@ class ValidationTest {
 
     private static BusinessProfile validBusinessProfile() {
         return BusinessProfile.builder()
-                .businessName("Acme Traders")
+                .businessName("Ajay Yadav")
                 .ownerName("Owner")
                 .phone("9876543210")
                 .email("owner@example.com")
@@ -511,6 +513,159 @@ class ValidationTest {
                 .amount(100.00)
                 .date(LocalDateTime.now().minusHours(1))
                 .build();
+    }
+
+    private static QuotationDTO validQuotation() {
+        return QuotationDTO.builder()
+                .clientId(UUID.randomUUID())
+                .clientName("Acme Corp")
+                .subtotal(1000.00)
+                .discount(0.0)
+                .grossAmount(1000.00)
+                .totalAmount(1000.00)
+                .netPayable(1000.00)
+                .items(List.of(validQuotationItem()))
+                .build();
+    }
+
+    private static QuotationItemDTO validQuotationItem() {
+        return QuotationItemDTO.builder()
+                .description("Service fee")
+                .quantity(1)
+                .amount(1000.00)
+                .build();
+    }
+
+    @Test
+    void quotationDtoRejectsNullClientId() {
+        QuotationDTO dto = validQuotation();
+        dto.setClientId(null);
+        assertViolationOn(dto, "clientId");
+    }
+
+    @Test
+    void quotationDtoRejectsBlankClientName() {
+        QuotationDTO dto = validQuotation();
+        dto.setClientName("");
+        assertViolationOn(dto, "clientName");
+    }
+
+    @Test
+    void quotationDtoRejectsEmptyItems() {
+        QuotationDTO dto = validQuotation();
+        dto.setItems(List.of());
+        assertViolationOn(dto, "items");
+    }
+
+    @Test
+    void quotationDtoRejectsNegativeSubtotal() {
+        QuotationDTO dto = validQuotation();
+        dto.setSubtotal(-1.0);
+        assertViolationOn(dto, "subtotal");
+    }
+
+    @Test
+    void quotationDtoRejectsNegativeTotalAmount() {
+        QuotationDTO dto = validQuotation();
+        dto.setTotalAmount(-100.0);
+        assertViolationOn(dto, "totalAmount");
+    }
+
+    @Test
+    void quotationDtoRejectsExcessiveNotes() {
+        QuotationDTO dto = validQuotation();
+        dto.setNotes("x".repeat(5001));
+        assertViolationOn(dto, "notes");
+    }
+
+    @Test
+    void quotationDtoRejectsExcessiveTermsAndConditions() {
+        QuotationDTO dto = validQuotation();
+        dto.setTermsAndConditions("x".repeat(10001));
+        assertViolationOn(dto, "termsAndConditions");
+    }
+
+    @Test
+    void quotationDtoAcceptsValidInput() {
+        assertNoViolationOn(validQuotation(), "clientId");
+        assertNoViolationOn(validQuotation(), "items");
+    }
+
+    @Test
+    void quotationItemDtoRejectsBlankDescription() {
+        QuotationItemDTO item = validQuotationItem();
+        item.setDescription("");
+        assertViolationOn(item, "description");
+    }
+
+    @Test
+    void quotationItemDtoRejectsNullQuantity() {
+        QuotationItemDTO item = validQuotationItem();
+        item.setQuantity(null);
+        assertViolationOn(item, "quantity");
+    }
+
+    @Test
+    void quotationItemDtoRejectsZeroQuantity() {
+        QuotationItemDTO item = validQuotationItem();
+        item.setQuantity(0);
+        assertViolationOn(item, "quantity");
+    }
+
+    @Test
+    void quotationItemDtoRejectsNullAmount() {
+        QuotationItemDTO item = validQuotationItem();
+        item.setAmount(null);
+        assertViolationOn(item, "amount");
+    }
+
+    @Test
+    void quotationItemDtoRejectsNegativeAmount() {
+        QuotationItemDTO item = validQuotationItem();
+        item.setAmount(-1.0);
+        assertViolationOn(item, "amount");
+    }
+
+    @Test
+    void quotationItemDtoRejectsNegativeKgs() {
+        QuotationItemDTO item = validQuotationItem();
+        item.setKgs(-5.0);
+        assertViolationOn(item, "kgs");
+    }
+
+    @Test
+    void quotationItemDtoRejectsExcessiveDescription() {
+        QuotationItemDTO item = validQuotationItem();
+        item.setDescription("x".repeat(501));
+        assertViolationOn(item, "description");
+    }
+
+    @Test
+    void quotationItemDtoAcceptsValidInput() {
+        assertNoViolationOn(validQuotationItem(), "description");
+        assertNoViolationOn(validQuotationItem(), "quantity");
+        assertNoViolationOn(validQuotationItem(), "amount");
+    }
+
+    @Test
+    void expenseDtoRejectsExcessiveReceiptUrl() {
+        ExpenseDTO dto = validExpense();
+        dto.setReceiptUrl("https://example.com/" + "x".repeat(500));
+        assertViolationOn(dto, "receiptUrl");
+    }
+
+    @Test
+    void expenseDtoRejectsExcessiveRecurringCycle() {
+        ExpenseDTO dto = validExpense();
+        dto.setRecurringCycle("x".repeat(51));
+        assertViolationOn(dto, "recurringCycle");
+    }
+
+    @Test
+    void expenseDtoAcceptsValidReceiptUrl() {
+        ExpenseDTO dto = validExpense();
+        dto.setReceiptUrl("https://example.com/receipt.pdf");
+        assertNoViolationOn(dto, "receiptUrl");
     }
 
     private static <T> void assertViolationOn(T target, String property) {

@@ -74,4 +74,69 @@ public class ActivityLog {
         this.deletedAt = timestamp;
         this.updatedAt = timestamp;
     }
+
+    public UUID getActivityId() { return activityId; }
+    public void setActivityId(UUID activityId) { this.activityId = activityId; }
+
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
+
+    public String getAction() { return action; }
+    public void setAction(String action) { this.action = action; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public Boolean getIsDeleted() { return isDeleted; }
+    public void setIsDeleted(Boolean isDeleted) { this.isDeleted = isDeleted; }
+
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
+
+    public Long getCreatedBy() { return createdBy; }
+    public void setCreatedBy(Long createdBy) { this.createdBy = createdBy; }
+
+    public Long getUpdatedBy() { return updatedBy; }
+    public void setUpdatedBy(Long updatedBy) { this.updatedBy = updatedBy; }
+
+    public static ActivityLogBuilder builder() { return new ActivityLogBuilder(); }
+
+    public static class ActivityLogBuilder {
+        private UUID activityId;
+        private User user;
+        private String action;
+        private LocalDateTime createdAt;
+        private LocalDateTime updatedAt;
+        private Boolean isDeleted = false;
+        private LocalDateTime deletedAt;
+        private Long createdBy;
+        private Long updatedBy;
+
+        public ActivityLogBuilder activityId(UUID activityId) { this.activityId = activityId; return this; }
+        public ActivityLogBuilder user(User user) { this.user = user; return this; }
+        public ActivityLogBuilder action(String action) { this.action = action; return this; }
+        public ActivityLogBuilder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
+        public ActivityLogBuilder updatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; return this; }
+        public ActivityLogBuilder isDeleted(Boolean isDeleted) { this.isDeleted = isDeleted; return this; }
+        public ActivityLogBuilder deletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; return this; }
+        public ActivityLogBuilder createdBy(Long createdBy) { this.createdBy = createdBy; return this; }
+        public ActivityLogBuilder updatedBy(Long updatedBy) { this.updatedBy = updatedBy; return this; }
+
+        public ActivityLog build() {
+            ActivityLog log = new ActivityLog();
+            log.activityId = this.activityId;
+            log.user = this.user;
+            log.action = this.action;
+            log.createdAt = this.createdAt;
+            log.updatedAt = this.updatedAt;
+            log.isDeleted = this.isDeleted;
+            log.deletedAt = this.deletedAt;
+            log.createdBy = this.createdBy;
+            log.updatedBy = this.updatedBy;
+            return log;
+        }
+    }
 }

@@ -148,7 +148,7 @@ public class ClientFinancialService {
         return ledgerRepository.findByClientIdAndUserIdAndIsDeletedFalseOrderByTransactionDateDesc(clientId, userId, pageable);
     }
 
-    @CacheEvict(value = {"dashboardStats", "clientFinancialSummary"}, allEntries = true)
+    @CacheEvict(value = "clientFinancialSummary", key = "#clientId.toString() + '_' + @securityUtils.getCurrentUserId()")
     public ReceivePaymentResponse receivePayment(UUID clientId, ReceivePaymentRequest request) {
         Long userId = securityUtils.getCurrentUserId();
         User user = securityUtils.getCurrentUser();
@@ -184,7 +184,8 @@ public class ClientFinancialService {
             try {
                 fraudDetectionService.evaluatePayment(savedPayment);
             } catch (Exception e) {
-                // Log warning but do not block payment flow in production if fraud evaluation fails
+                org.slf4j.LoggerFactory.getLogger(ClientFinancialService.class)
+                        .warn("Fraud detection failed for payment {}: {}", savedPayment.getPaymentId(), e.getMessage(), e);
             }
             appMetrics.recordPaymentDuration(System.currentTimeMillis() - paymentStart);
 
@@ -192,6 +193,8 @@ public class ClientFinancialService {
             BigDecimal appliedToInvoices = BigDecimal.ZERO;
 
             List<Invoice> pendingInvoices = invoiceRepository.findPendingInvoicesByClient(clientId, userId);
+            List<Invoice> updatedInvoices = new java.util.ArrayList<>();
+            double runningAdvanceBalance = getAdvanceBalance(clientId, userId);
 
             for (Invoice invoice : pendingInvoices) {
                 if (remainingReceipt.compareTo(BigDecimal.ZERO) <= 0) break;
@@ -210,7 +213,7 @@ public class ClientFinancialService {
                 invoice.setPaymentDate(when);
                 invoice.setPaymentStatus(statusFor(totalAmount.doubleValue(), newPaid.doubleValue()));
                 invoice.setUpdatedAt(LocalDateTime.now());
-                invoiceRepository.save(invoice);
+                updatedInvoices.add(invoice);
 
                 addLedgerEntry(
                         client,
@@ -221,7 +224,8 @@ public class ClientFinancialService {
                         applied.doubleValue(),
                         when,
                         "Payment applied to invoice " + invoice.getInvoiceNumber(),
-                        request.getDeviceId()
+                        request.getDeviceId(),
+                        runningAdvanceBalance
                 );
 
                 savedPayment.setInvoice(invoice);
@@ -232,9 +236,14 @@ public class ClientFinancialService {
                 eventPublisher.publishEvent(new PaymentRecordedEvent(this, savedPayment, invoice, applied.doubleValue(), newPending.doubleValue()));
             }
 
+            if (!updatedInvoices.isEmpty()) {
+                invoiceRepository.saveAll(updatedInvoices);
+            }
+
             BigDecimal addedToAdvance = BigDecimal.ZERO;
             if (remainingReceipt.compareTo(BigDecimal.ZERO) > 0) {
                 addedToAdvance = remainingReceipt;
+                runningAdvanceBalance = Math.max(runningAdvanceBalance + remainingReceipt.doubleValue(), 0.0);
                 addLedgerEntry(
                         client,
                         null,
@@ -244,7 +253,8 @@ public class ClientFinancialService {
                         remainingReceipt.doubleValue(),
                         when,
                         request.getNotes() != null ? request.getNotes() : "Money received",
-                        request.getDeviceId()
+                        request.getDeviceId(),
+                        runningAdvanceBalance
                 );
 
                 eventPublisher.publishEvent(new AdvanceBalanceAvailableEvent(this, client, user, remainingReceipt.doubleValue()));
@@ -269,6 +279,93 @@ public class ClientFinancialService {
         }
     }
 
+    @CacheEvict(value = "clientFinancialSummary", key = "#clientId.toString() + '_' + @securityUtils.getCurrentUserId()")
+    public ReceivePaymentResponse receiveAdvance(UUID clientId, ReceivePaymentRequest request) {
+        // Receive advance is the same as receive payment but explicitly for advances
+        // The receivePayment method already handles this: applies to pending invoices first,
+        // then adds remainder to advance balance
+        return receivePayment(clientId, request);
+    }
+
+    @CacheEvict(value = "clientFinancialSummary", key = "#clientId.toString() + '_' + @securityUtils.getCurrentUserId()")
+    public void deleteAdvance(UUID clientId, UUID ledgerEntryId) {
+        Long userId = securityUtils.getCurrentUserId();
+        User user = securityUtils.getCurrentUser();
+
+        long lockKey = clientId.getMostSignificantBits();
+        if (!databaseLockService.tryLock(lockKey)) {
+            throw new ConcurrentModificationException("Concurrent operations on client " + clientId + " are not allowed.");
+        }
+
+        try {
+            Client client = clientRepository.findByIdAndUserIdAndIsDeletedFalseWithLock(clientId, userId)
+                    .orElseThrow(() -> new ForbiddenException("Client not found or access denied"));
+
+            ClientLedgerEntry advanceEntry = ledgerRepository.findByIdAndUserId(ledgerEntryId, userId)
+                    .orElseThrow(() -> new ForbiddenException("Advance entry not found"));
+
+            if (!advanceEntry.getClient().getId().equals(clientId)) {
+                throw new ForbiddenException("Advance entry does not belong to this client");
+            }
+
+            if (advanceEntry.getType() != LedgerEntryType.ADVANCE_RECEIVED) {
+                throw new IllegalArgumentException("Only ADVANCE_RECEIVED entries can be deleted via this endpoint");
+            }
+
+            if (Boolean.TRUE.equals(advanceEntry.getIsDeleted())) {
+                throw new IllegalStateException("Advance entry already deleted");
+            }
+
+            double advanceAmount = advanceEntry.getAmount();
+            double currentAdvanceBalance = getAdvanceBalance(clientId, userId);
+
+            // Check if this advance has been partially or fully applied
+            List<ClientLedgerEntry> appliedEntries = ledgerRepository.findByClientIdAndUserIdAndIsDeletedFalseOrderByTransactionDateDesc(clientId, userId, Pageable.unpaged())
+                    .stream()
+                    .filter(e -> e.getType() == LedgerEntryType.ADVANCE_APPLIED
+                            && e.getInvoice() != null
+                            && e.getTransactionDate().isAfter(advanceEntry.getTransactionDate())
+                            && e.getTransactionDate().isBefore(LocalDateTime.now().plusSeconds(1)))
+                    .toList();
+
+            double totalApplied = appliedEntries.stream().mapToDouble(ClientLedgerEntry::getAmount).sum();
+            double remainingAdvance = advanceAmount - totalApplied;
+
+            if (remainingAdvance < 0) {
+                throw new IllegalStateException("Advance has been over-applied, cannot delete");
+            }
+
+            // If there are subsequent invoices that used this advance, we need to handle that
+            // For safety, only allow deletion if the advance is fully unapplied
+            if (remainingAdvance < advanceAmount - 0.01) { // small epsilon for floating point
+                throw new IllegalStateException("Cannot delete advance that has been applied to invoices. Reverse the invoice application first.");
+            }
+
+            LocalDateTime now = LocalDateTime.now();
+
+            // Mark the advance entry as deleted
+            advanceEntry.markDeleted(now);
+            ledgerRepository.save(advanceEntry);
+
+            // Create a reversing ADJUSTMENT entry to reduce the advance balance
+            addLedgerEntry(
+                    client,
+                    null,
+                    null,
+                    LedgerEntryType.ADJUSTMENT,
+                    LedgerDirection.DEBIT,
+                    advanceAmount,
+                    now,
+                    "Advance deleted: " + (advanceEntry.getNotes() != null ? advanceEntry.getNotes() : "Money received"),
+                    advanceEntry.getDeviceId(),
+                    Math.max(currentAdvanceBalance - advanceAmount, 0.0)
+            );
+
+        } finally {
+            databaseLockService.unlock(lockKey);
+        }
+    }
+
     public ClientLedgerEntry addLedgerEntry(
             Client client,
             Invoice invoice,
@@ -280,8 +377,25 @@ public class ClientFinancialService {
             String notes,
             String deviceId
     ) {
+        return addLedgerEntry(client, invoice, payment, type, direction, amount, when, notes, deviceId, null);
+    }
+
+    public ClientLedgerEntry addLedgerEntry(
+            Client client,
+            Invoice invoice,
+            Payment payment,
+            LedgerEntryType type,
+            LedgerDirection direction,
+            double amount,
+            LocalDateTime when,
+            String notes,
+            String deviceId,
+            Double knownBalanceAfter
+    ) {
         User user = invoice != null && invoice.getUser() != null ? invoice.getUser() : securityUtils.getCurrentUser();
-        double balanceAfter = computeLedgerBalance(client.getId(), user.getId(), type, direction, amount);
+        double balanceAfter = knownBalanceAfter != null
+                ? knownBalanceAfter
+                : computeLedgerBalance(client.getId(), user.getId(), type, direction, amount);
 
         ClientLedgerEntry entry = ClientLedgerEntry.builder()
                 .client(client)
@@ -333,5 +447,37 @@ public class ClientFinancialService {
             if (value != null) return value;
         }
         return LocalDateTime.MAX;
+    }
+
+    @CacheEvict(value = "clientFinancialSummary", key = "#clientId.toString() + '_' + @securityUtils.getCurrentUserId()")
+    public void releaseAdvanceFromInvoice(UUID clientId, Long userId, double advanceAmount, LocalDateTime when, String invoiceNumber) {
+        long lockKey = clientId.getMostSignificantBits();
+        if (!databaseLockService.tryLock(lockKey)) {
+            throw new ConcurrentModificationException("Concurrent operations on client " + clientId + " are not allowed.");
+        }
+
+        try {
+            Client client = clientRepository.findByIdAndUserIdAndIsDeletedFalseWithLock(clientId, userId)
+                    .orElseThrow(() -> new ForbiddenException("Client not found or access denied"));
+
+            double currentAdvanceBalance = getAdvanceBalance(clientId, userId);
+
+            // Create ADVANCE_APPLIED reversal (negative application = credit back to advance)
+            addLedgerEntry(
+                    client,
+                    null,
+                    null,
+                    LedgerEntryType.ADVANCE_APPLIED,
+                    LedgerDirection.DEBIT, // DEBIT reverses the CREDIT that was applied
+                    advanceAmount,
+                    when,
+                    "Advance released from cancelled invoice " + invoiceNumber,
+                    client.getDeviceId(),
+                    currentAdvanceBalance + advanceAmount
+            );
+
+        } finally {
+            databaseLockService.unlock(lockKey);
+        }
     }
 }

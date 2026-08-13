@@ -10,6 +10,8 @@ import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import com.mybill.MyBill_Backend.entity.TaxType;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -34,8 +36,43 @@ public class InvoiceRequest {
     @Size(max = 1000, message = "Notes must be 1000 characters or fewer")
     private String notes;
 
+    /** Applicable GST rate (0 = no tax). Supported: 0, 5, 12, 18, 28. */
+    @DecimalMin(value = "0.00", message = "Tax rate cannot be negative")
+    @DecimalMax(value = "100.00", message = "Tax rate is too large")
+    private Double taxRate;
+
+    /**
+     * Optional explicit GST type override. When omitted, the service auto-resolves
+     * INTRA/INTER from business and customer states.
+     */
+    private TaxType gstType;
+
     @AssertTrue(message = "Due date must be on or after invoice date")
     public boolean isDueDateOnOrAfterInvoiceDate() {
         return invoiceDate == null || dueDate == null || !dueDate.isBefore(invoiceDate);
     }
+
+    public UUID getClientId() { return clientId; }
+    public void setClientId(UUID clientId) { this.clientId = clientId; }
+
+    public List<UUID> getWorkIds() { return workIds; }
+    public void setWorkIds(List<UUID> workIds) { this.workIds = workIds; }
+
+    public LocalDateTime getInvoiceDate() { return invoiceDate; }
+    public void setInvoiceDate(LocalDateTime invoiceDate) { this.invoiceDate = invoiceDate; }
+
+    public LocalDateTime getDueDate() { return dueDate; }
+    public void setDueDate(LocalDateTime dueDate) { this.dueDate = dueDate; }
+
+    public Double getDiscount() { return discount; }
+    public void setDiscount(Double discount) { this.discount = discount; }
+
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
+
+    public Double getTaxRate() { return taxRate; }
+    public void setTaxRate(Double taxRate) { this.taxRate = taxRate; }
+
+    public TaxType getGstType() { return gstType; }
+    public void setGstType(TaxType gstType) { this.gstType = gstType; }
 }

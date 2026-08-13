@@ -44,7 +44,9 @@ public class InvoiceController {
                 request.getWorkIds(),
                 request.getDiscount(),
                 request.getNotes(),
-                request.getDueDate()
+                request.getDueDate(),
+                request.getTaxRate(),
+                request.getGstType()
         );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(invoice);
@@ -88,7 +90,10 @@ public class InvoiceController {
     public ResponseEntity<InvoicePreview> preview(@Valid @RequestBody InvoiceRequest request) {
         InvoicePreview preview = invoiceService.previewInvoice(
                 request.getClientId(),
-                request.getWorkIds()
+                request.getWorkIds(),
+                request.getDiscount(),
+                request.getTaxRate(),
+                request.getGstType()
         );
 
         return ResponseEntity.ok(preview);
@@ -201,5 +206,17 @@ public class InvoiceController {
 
         @PastOrPresent(message = "Payment date cannot be in the future")
         private LocalDateTime paymentDate;
+
+        public String getStatus() { return status; }
+        public void setStatus(String status) { this.status = status; }
+
+        public Double getPaidAmount() { return paidAmount; }
+        public void setPaidAmount(Double paidAmount) { this.paidAmount = paidAmount; }
+
+        public PaymentMode getPaymentMode() { return paymentMode; }
+        public void setPaymentMode(PaymentMode paymentMode) { this.paymentMode = paymentMode; }
+
+        public LocalDateTime getPaymentDate() { return paymentDate; }
+        public void setPaymentDate(LocalDateTime paymentDate) { this.paymentDate = paymentDate; }
     }
 }

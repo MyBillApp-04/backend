@@ -7,9 +7,13 @@ import com.mybill.MyBill_Backend.entity.Client;
 import com.mybill.MyBill_Backend.entity.ClientWork;
 import com.mybill.MyBill_Backend.entity.Invoice;
 import com.mybill.MyBill_Backend.entity.InvoiceItem;
+import com.mybill.MyBill_Backend.entity.LedgerEntryType;
+import com.mybill.MyBill_Backend.entity.LedgerDirection;
 import com.mybill.MyBill_Backend.entity.PaymentMode;
 import com.mybill.MyBill_Backend.entity.PaymentStatus;
+import com.mybill.MyBill_Backend.entity.TaxType;
 import com.mybill.MyBill_Backend.entity.User;
+import com.mybill.MyBill_Backend.repository.BusinessProfileRepository;
 import com.mybill.MyBill_Backend.repository.ClientRepository;
 import com.mybill.MyBill_Backend.repository.ClientWorkRepository;
 import com.mybill.MyBill_Backend.repository.InvoiceItemRepository;
@@ -52,6 +56,7 @@ public class InvoiceService {
     private final ApplicationEventPublisher eventPublisher;
     private final AuditTrailService auditTrailService;
     private final com.mybill.MyBill_Backend.observability.AppMetrics appMetrics;
+    private final BusinessProfileRepository businessProfileRepository;
 
     @Transactional
     @CacheEvict(value = {"dashboardStats", "clientFinancialSummary"}, allEntries = true)
@@ -60,10 +65,12 @@ public class InvoiceService {
             List<UUID> workIds,
             Double discount,
             String notes,
-            LocalDateTime dueDate
+            LocalDateTime dueDate,
+            Double taxRate,
+            TaxType gstType
     ) {
         Long userId = securityUtils.getCurrentUserId();
-        return generateInvoiceForUser(clientId, workIds, discount, notes, dueDate, userId);
+        return generateInvoiceForUser(clientId, workIds, discount, notes, dueDate, taxRate, gstType, userId);
     }
 
     @Transactional
@@ -74,6 +81,8 @@ public class InvoiceService {
             Double discount,
             String notes,
             LocalDateTime dueDate,
+            Double taxRate,
+            TaxType gstType,
             Long userId
     ) {
         User user = userRepository.findById(userId)
@@ -118,9 +127,22 @@ public class InvoiceService {
             throw new RuntimeException("Discount cannot be greater than subtotal");
         }
 
+        // Authoritative GST snapshot (single authoritative tax path; mirrored offline).
+        double safeRate = roundMoney(taxRate != null ? taxRate : 0.0);
+        TaxType resolvedType = gstType;
+        if (resolvedType == null) {
+            String businessState = businessProfileRepository.findByUserId(userId)
+                    .map(com.mybill.MyBill_Backend.entity.BusinessProfile::getState)
+                    .orElse(null);
+            resolvedType = safeRate > 0.0
+                    ? TaxCalculator.resolveTaxType(businessState, client.getState())
+                    : TaxType.NONE;
+        }
+        TaxCalculator.TaxBreakdown tax = TaxCalculator.calculate(grossAmount, safeRate, resolvedType);
+
         double availableAdvance = roundMoney(clientFinancialService.getAdvanceBalance(clientId, userId));
-        double advanceApplied = roundMoney(Math.min(availableAdvance, grossAmount));
-        double netPayable = roundMoney(Math.max(grossAmount - advanceApplied, 0.0));
+        double advanceApplied = roundMoney(Math.min(availableAdvance, tax.total));
+        double netPayable = TaxCalculator.amountDue(tax.total, advanceApplied);
 
         LocalDateTime now = LocalDateTime.now();
         InvoiceNumberService.InvoiceNumberResult invoiceNumber =
@@ -137,6 +159,14 @@ public class InvoiceService {
                 .subtotal(subtotal)
                 .discount(finalDiscount)
                 .grossAmount(grossAmount)
+                .taxRate(tax.rate)
+                .taxType(tax.type)
+                .taxableAmount(tax.taxableAmount)
+                .taxAmount(tax.taxAmount)
+                .cgstAmount(tax.cgstAmount)
+                .sgstAmount(tax.sgstAmount)
+                .igstAmount(tax.igstAmount)
+                .total(tax.total)
                 .advanceApplied(advanceApplied)
                 .netPayable(netPayable)
                 .totalAmount(netPayable)
@@ -217,17 +247,9 @@ public class InvoiceService {
         invoice.setPaymentMode(mode);
         invoice.setPaymentDate(paymentDate != null ? paymentDate : LocalDateTime.now());
 
-        double pending = totalAmount - cappedPaidAmount;
-        invoice.setPendingAmount(Math.max(pending, 0.0));
-        invoice.setRemainingAmount(Math.max(pending, 0.0));
-
-        if (totalAmount <= 0 || cappedPaidAmount >= totalAmount) {
-            invoice.setPaymentStatus(PaymentStatus.PAID);
-        } else if (cappedPaidAmount > 0) {
-            invoice.setPaymentStatus(PaymentStatus.PARTIALLY_PAID);
-        } else {
-            invoice.setPaymentStatus(PaymentStatus.UNPAID);
-        }
+        // Delegate pending/remaining/status derivation to the entity's single
+        // source of truth (mirror of preUpdate.applyPendingAndStatus).
+        invoice.applyPendingAndStatus();
 
         invoice.setUpdatedAt(LocalDateTime.now());
 
@@ -300,15 +322,44 @@ public class InvoiceService {
     }
 
     @Transactional(readOnly = true)
-    public InvoicePreview previewInvoice(UUID clientId, List<UUID> workIds) {
+    public InvoicePreview previewInvoice(UUID clientId, List<UUID> workIds, Double discount, Double taxRate, TaxType gstType) {
         Long userId = securityUtils.getCurrentUserId();
 
         InvoiceValidationResult result = validateInvoiceInput(clientId, workIds, userId);
 
+        double subtotal = roundMoney(result.works().stream()
+                .mapToDouble(w -> w.getAmount() != null ? w.getAmount() : 0.0)
+                .sum());
+        double finalDiscount = roundMoney(discount != null ? discount : 0.0);
+        double grossAmount = roundMoney(subtotal - finalDiscount);
+        if (grossAmount < 0) {
+            throw new RuntimeException("Discount cannot be greater than subtotal");
+        }
+
+        double safeRate = roundMoney(taxRate != null ? taxRate : 0.0);
+        TaxType resolved = gstType;
+        if (resolved == null && safeRate > 0.0) {
+            String businessState = businessProfileRepository.findByUserId(userId)
+                    .map(com.mybill.MyBill_Backend.entity.BusinessProfile::getState)
+                    .orElse(null);
+            resolved = TaxCalculator.resolveTaxType(businessState, result.client().getState());
+        }
+        if (resolved == null) {
+            resolved = TaxType.NONE;
+        }
+        TaxCalculator.TaxBreakdown tax = TaxCalculator.calculate(grossAmount, safeRate, resolved);
+
         return new InvoicePreview(
                 result.client(),
                 result.works(),
-                result.total()
+                tax.total,
+                tax.rate,
+                tax.type,
+                tax.taxableAmount,
+                tax.taxAmount,
+                tax.cgstAmount,
+                tax.sgstAmount,
+                tax.igstAmount
         );
     }
 
@@ -532,6 +583,9 @@ public class InvoiceService {
         Invoice invoice = getInvoiceById(invoiceId);
         LocalDateTime now = LocalDateTime.now();
 
+        double advanceApplied = invoice.getAdvanceApplied() != null ? invoice.getAdvanceApplied() : 0.0;
+        UUID clientId = invoice.getClient().getId();
+
         if (invoice.getItems() != null && !invoice.getItems().isEmpty()) {
             List<UUID> workIds = invoice.getItems()
                     .stream()
@@ -565,6 +619,11 @@ public class InvoiceService {
 
         invoiceRepository.save(invoice);
         auditTrailService.logChange("Invoice", invoice.getId(), "DELETE", "Soft deleted invoice");
+
+        // Release advance back to customer balance if advance was applied
+        if (advanceApplied > 0) {
+            clientFinancialService.releaseAdvanceFromInvoice(clientId, userId, advanceApplied, now, invoice.getInvoiceNumber());
+        }
     }
 
     private double roundMoney(double value) {

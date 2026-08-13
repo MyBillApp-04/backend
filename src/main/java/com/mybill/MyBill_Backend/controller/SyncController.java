@@ -26,7 +26,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipException;
 
 @RestController
-@RequestMapping("/api/sync")
+@RequestMapping({"/api/sync", "/api/v1/sync"})
 @RequiredArgsConstructor
 public class SyncController {
 
@@ -39,6 +39,19 @@ public class SyncController {
 
     @PostMapping
     public ResponseEntity<SyncResponse> sync(HttpServletRequest request) throws IOException {
+        SyncRequest syncRequest = readBoundedSyncRequest(request, false);
+        validateSyncRequest(syncRequest);
+        return ResponseEntity.ok(syncService.sync(syncRequest));
+    }
+
+    @PostMapping("/background")
+    public ResponseEntity<SyncResponse> backgroundSync(HttpServletRequest request) throws IOException {
+        SyncRequest syncRequest = readBoundedSyncRequest(request, true);
+        validateSyncRequest(syncRequest);
+        return ResponseEntity.ok(syncService.sync(syncRequest));
+    }
+
+    private SyncRequest readBoundedSyncRequest(HttpServletRequest request, boolean background) throws IOException {
         InputStream inputStream = request.getInputStream();
         String encoding = request.getHeader("Content-Encoding");
 
@@ -69,18 +82,18 @@ public class SyncController {
             HttpStatus status = gzipped ? HttpStatus.UNSUPPORTED_MEDIA_TYPE : HttpStatus.BAD_REQUEST;
             throw new ResponseStatusException(status, "Unable to read sync request body", e);
         }
-        validateSyncRequest(syncRequest);
-        return ResponseEntity.ok(syncService.sync(syncRequest));
-    }
 
-    @PostMapping("/background")
-    public ResponseEntity<SyncResponse> backgroundSync(@Valid @RequestBody SyncRequest syncRequest) {
-        syncRequest.setBackground(true);
-        return ResponseEntity.ok(syncService.sync(syncRequest));
+        if (background) {
+            syncRequest.setBackground(true);
+        }
+        return syncRequest;
     }
 
     @GetMapping("/status/{deviceId}")
     public ResponseEntity<Map<String, Object>> deviceStatus(@PathVariable String deviceId) {
+        if (deviceId == null || deviceId.isBlank() || deviceId.length() > 128) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid device id");
+        }
         return ResponseEntity.ok(syncService.getDeviceSyncStatus(deviceId));
     }
 

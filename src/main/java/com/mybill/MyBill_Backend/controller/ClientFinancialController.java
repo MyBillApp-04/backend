@@ -38,4 +38,21 @@ public class ClientFinancialController {
     ) {
         return ResponseEntity.ok(financialService.receivePayment(clientId, request));
     }
+
+    @PostMapping("/advances")
+    public ResponseEntity<ReceivePaymentResponse> receiveAdvance(
+            @PathVariable UUID clientId,
+            @Valid @RequestBody ReceivePaymentRequest request
+    ) {
+        return ResponseEntity.ok(financialService.receiveAdvance(clientId, request));
+    }
+
+    @DeleteMapping("/advances/{ledgerEntryId}")
+    public ResponseEntity<Void> deleteAdvance(
+            @PathVariable UUID clientId,
+            @PathVariable UUID ledgerEntryId
+    ) {
+        financialService.deleteAdvance(clientId, ledgerEntryId);
+        return ResponseEntity.noContent().build();
+    }
 }

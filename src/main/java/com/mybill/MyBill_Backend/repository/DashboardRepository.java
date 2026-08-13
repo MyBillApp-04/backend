@@ -11,6 +11,16 @@ import java.time.LocalDateTime;
 public interface DashboardRepository extends JpaRepository<User, Long> {
 
     @Query(value = """
+            WITH top_client_cte AS (
+                SELECT c.id AS client_id, c.name AS client_name
+                FROM invoice inv
+                JOIN clients c ON inv.client_id = c.id
+                WHERE inv.user_id = :userId
+                AND COALESCE(inv.is_deleted, false) = false
+                GROUP BY c.id, c.name
+                ORDER BY SUM(inv.total_amount) DESC
+                LIMIT 1
+            )
             SELECT
                 (
                     SELECT COUNT(*)
@@ -19,60 +29,20 @@ public interface DashboardRepository extends JpaRepository<User, Long> {
                     AND COALESCE(c.is_deleted, false) = false
                 ) AS totalClients,
 
-                (
-                    SELECT COALESCE(SUM(i.total_amount), 0)
-                    FROM invoice i
-                    WHERE i.user_id = :userId
-                    AND COALESCE(i.is_deleted, false) = false
-                    AND i.created_date >= :monthStart
-                    AND i.created_date < :nextMonthStart
-                ) AS thisMonthBilled,
+                COALESCE(SUM(CASE WHEN i.created_date >= :monthStart AND i.created_date < :nextMonthStart THEN i.total_amount ELSE 0 END), 0) AS thisMonthBilled,
 
-                (
-                    SELECT COALESCE(SUM(i.paid_amount), 0)
-                    FROM invoice i
-                    WHERE i.user_id = :userId
-                    AND COALESCE(i.is_deleted, false) = false
-                    AND i.payment_date >= :monthStart
-                    AND i.payment_date < :nextMonthStart
-                ) AS thisMonthReceived,
+                COALESCE(SUM(CASE WHEN i.payment_date >= :monthStart AND i.payment_date < :nextMonthStart THEN i.paid_amount ELSE 0 END), 0) AS thisMonthReceived,
 
-                (
-                    SELECT COALESCE(SUM(i.pending_amount), 0)
-                    FROM invoice i
-                    WHERE i.user_id = :userId
-                    AND COALESCE(i.is_deleted, false) = false
-                ) AS totalPending,
+                COALESCE(SUM(i.pending_amount), 0) AS totalPending,
 
-                (
-                    SELECT COUNT(*)
-                    FROM invoice i
-                    WHERE i.user_id = :userId
-                    AND COALESCE(i.is_deleted, false) = false
-                    AND i.payment_status IN ('UNPAID', 'PARTIALLY_PAID')
-                ) AS pendingInvoices,
+                COUNT(CASE WHEN i.payment_status IN ('UNPAID', 'PARTIALLY_PAID') THEN 1 END) AS pendingInvoices,
 
-                (
-                    SELECT c.name
-                    FROM invoice inv
-                    JOIN clients c ON inv.client_id = c.id
-                    WHERE inv.user_id = :userId
-                    AND COALESCE(inv.is_deleted, false) = false
-                    GROUP BY c.id, c.name
-                    ORDER BY SUM(inv.total_amount) DESC
-                    LIMIT 1
-                ) AS topClient,
+                (SELECT client_name FROM top_client_cte) AS topClient,
 
-                (
-                    SELECT CAST(c.id AS VARCHAR)
-                    FROM invoice inv
-                    JOIN clients c ON inv.client_id = c.id
-                    WHERE inv.user_id = :userId
-                    AND COALESCE(inv.is_deleted, false) = false
-                    GROUP BY c.id, c.name
-                    ORDER BY SUM(inv.total_amount) DESC
-                    LIMIT 1
-                ) AS topClientId
+                (SELECT CAST(client_id AS VARCHAR) FROM top_client_cte) AS topClientId
+            FROM invoice i
+            WHERE i.user_id = :userId
+            AND COALESCE(i.is_deleted, false) = false
             """, nativeQuery = true)
     DashboardStatsProjection getDashboardStats(
             @Param("userId") Long userId,
