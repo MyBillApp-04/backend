@@ -13,11 +13,21 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.HexFormat;
 import java.util.regex.Pattern;
 import java.nio.charset.StandardCharsets;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.security.MessageDigest;
-import java.util.HexFormat;
-import java.util.Set;
+import javax.net.ssl.HttpsURLConnection;
+import java.security.Signature;
 
 @Service
 @RequiredArgsConstructor
@@ -65,6 +75,17 @@ public class BusinessProfileService {
 
             existing.setThankYouNote(clean(profile.getThankYouNote()));
             existing.setTermsAndConditions(clean(profile.getTermsAndConditions()));
+
+            // Delete Cloudinary images if paths are being cleared
+            if (profile.getLogoPath() == null || profile.getLogoPath().isEmpty()) {
+                deleteCloudinaryImage(existing.getLogoPublicId(), ImageField.LOGO);
+            }
+            if (profile.getQrImagePath() == null || profile.getQrImagePath().isEmpty()) {
+                deleteCloudinaryImage(existing.getQrImagePublicId(), ImageField.QR);
+            }
+            if (profile.getSignaturePath() == null || profile.getSignaturePath().isEmpty()) {
+                deleteCloudinaryImage(existing.getSignaturePublicId(), ImageField.SIGNATURE);
+            }
 
             existing.setLogoPath(cleanExistingImagePath(profile.getLogoPath(), existing.getLogoPath()));
             existing.setQrImagePath(cleanExistingImagePath(profile.getQrImagePath(), existing.getQrImagePath()));
@@ -259,6 +280,13 @@ public class BusinessProfileService {
         } catch (Exception e) { return false; }
     }
 
+    private String computeCloudinarySignature(String publicId, Long version) {
+        try {
+            byte[] bytes = MessageDigest.getInstance("SHA-1").digest(("public_id=" + publicId + "&version=" + version + cloudinaryApiSecret.trim()).getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(bytes);
+        } catch (Exception e) { return null; }
+    }
+
     private String required(String value, String fallback) {
         String cleanValue = clean(value);
         return cleanValue != null ? cleanValue : fallback;
@@ -268,6 +296,62 @@ public class BusinessProfileService {
         LOGO,
         QR,
         SIGNATURE
+    }
+
+    @Transactional
+    @CacheEvict(value = "businessProfiles", key = "@securityUtils.getCurrentUserId()")
+    public void deleteCloudinaryImage(String publicId, ImageField field) {
+        if (publicId == null || publicId.isEmpty()) return;
+
+        String cloudName = cloudinaryCloudName;
+        if (cloudName == null || cloudName.isBlank()) {
+            return;
+        }
+
+        try {
+            String destroyUrl = "https://api.cloudinary.com/v1_1/" + cloudName + "/image/destroy";
+            URL url = new URL(destroyUrl);
+            HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+
+            String signature = computeCloudinarySignature(publicId, null);
+            Map<String, String> params = new HashMap<>();
+            params.put("public_id", publicId);
+            if (signature != null) {
+                params.put("signature", signature);
+            }
+            params.put("api_secret", cloudinaryApiSecret);
+
+            StringBuilder postData = new StringBuilder();
+            for (Map.Entry<String, String> param : params.entrySet()) {
+                if (postData.length() != 0) postData.append('&');
+                postData.append(URLEncoder.encode(param.getKey(), "UTF-8") + '=' + URLEncoder.encode(param.getValue(), "UTF-8"));
+            }
+            byte[] postDataBytes = postData.toString().getBytes("UTF-8");
+
+            connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+            connection.setRequestProperty("Content-Length", String.valueOf(postDataBytes.length));
+
+            try (OutputStream os = connection.getOutputStream()) {
+                os.write(postDataBytes);
+            }
+
+            int responseCode = connection.getResponseCode();
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+                String inputLine;
+                StringBuilder response = new StringBuilder();
+                while ((inputLine = in.readLine()) != null) {
+                    response.append(inputLine);
+                }
+            } catch (IOException e) {
+                // Ignore read errors
+            }
+
+            connection.disconnect();
+        } catch (Exception e) {
+            // Ignore deletion errors
+        }
     }
 
     public record ImageMetadata(
