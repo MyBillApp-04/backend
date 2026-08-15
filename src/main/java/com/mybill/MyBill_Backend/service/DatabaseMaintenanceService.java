@@ -15,8 +15,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @ConditionalOnProperty(value = "app.scheduling.enabled", havingValue = "true", matchIfMissing = false)
 public class DatabaseMaintenanceService {
 
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DatabaseMaintenanceService.class);
-
     private final JdbcTemplate jdbcTemplate;
     private final AtomicBoolean running = new AtomicBoolean(false);
 

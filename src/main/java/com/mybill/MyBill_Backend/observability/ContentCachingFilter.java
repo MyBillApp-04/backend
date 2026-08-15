@@ -17,6 +17,8 @@ import java.util.Locale;
 @Order(Ordered.HIGHEST_PRECEDENCE + 1)
 public class ContentCachingFilter extends OncePerRequestFilter {
 
+    private static final int MAX_BODY_SIZE = 1024 * 1024; // 1 MB
+
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
@@ -26,7 +28,7 @@ public class ContentCachingFilter extends OncePerRequestFilter {
         if (request instanceof ContentCachingRequestWrapper || shouldSkipCaching(request)) {
             filterChain.doFilter(request, response);
         } else {
-            ContentCachingRequestWrapper wrappedRequest = new ContentCachingRequestWrapper(request);
+            ContentCachingRequestWrapper wrappedRequest = new ContentCachingRequestWrapper(request, MAX_BODY_SIZE);
             filterChain.doFilter(wrappedRequest, response);
         }
     }

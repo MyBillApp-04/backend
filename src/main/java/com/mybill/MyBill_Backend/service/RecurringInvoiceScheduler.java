@@ -22,8 +22,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @ConditionalOnProperty(value = "app.scheduling.enabled", havingValue = "true", matchIfMissing = false)
 public class RecurringInvoiceScheduler {
 
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RecurringInvoiceScheduler.class);
-
     private final RecurringInvoiceScheduleRepository scheduleRepository;
     private final RecurringInvoiceSchedulerSelfProxy selfProxy;
     private final DatabaseLockService databaseLockService;

@@ -18,8 +18,6 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class DatabaseHealthIndicator implements HealthIndicator {
 
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DatabaseHealthIndicator.class);
-
     private final JdbcTemplate jdbcTemplate;
 
     @Override
