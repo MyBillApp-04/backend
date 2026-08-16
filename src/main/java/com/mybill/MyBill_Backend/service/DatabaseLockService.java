@@ -1,14 +1,11 @@
 package com.mybill.MyBill_Backend.service;
 
-import com.mybill.MyBill_Backend.observability.SecureLogMessageConverter;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DatabaseLockService {
@@ -31,8 +28,6 @@ public class DatabaseLockService {
             return Boolean.TRUE.equals(locked);
         } catch (RuntimeException ex) {
             advisoryLocksAvailable.set(false);
-            log.debug("Database advisory locks are unavailable; falling back to local scheduler guard: exception={} message={}",
-                    ex.getClass().getSimpleName(), SecureLogMessageConverter.sanitize(ex.getMessage()));
             return true;
         }
     }
@@ -46,8 +41,6 @@ public class DatabaseLockService {
             jdbcTemplate.queryForObject("SELECT pg_advisory_unlock(?)", Boolean.class, key);
         } catch (RuntimeException ex) {
             advisoryLocksAvailable.set(false);
-            log.debug("Failed to release database advisory lock {}; disabling advisory locks for this runtime: exception={} message={}",
-                    key, ex.getClass().getSimpleName(), SecureLogMessageConverter.sanitize(ex.getMessage()));
         }
     }
 }

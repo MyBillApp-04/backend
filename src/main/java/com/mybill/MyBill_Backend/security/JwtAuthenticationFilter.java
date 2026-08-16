@@ -36,12 +36,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String path = request.getServletPath();
 
-        if (log.isDebugEnabled()) {
-            log.debug("--- JWT FILTER TRIGGERED ---");
-            log.debug("Request Path: {}", path);
-            log.debug("HTTP Method: {}", request.getMethod());
-        }
-
         if (path.startsWith("/api/auth/") || path.startsWith("/auth/")) {
             filterChain.doFilter(request, response);
             return;
@@ -49,12 +43,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String header = request.getHeader("Authorization");
 
-        if (log.isDebugEnabled()) {
-            log.debug("Authorization header present: {}", header != null);
-        }
-
         if (header == null || !header.startsWith("Bearer ")) {
-            if (log.isDebugEnabled()) log.debug("Action: No valid Bearer token found. Passing to Spring Security as unauthenticated.");
             filterChain.doFilter(request, response);
             return;
         }
@@ -69,9 +58,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             if (jwtUtil.validateToken(token)) {
                 String email = jwtUtil.extractEmail(token);
-                if (log.isDebugEnabled()) {
-                    log.debug("Token Status: VALID");
-                }
 
                 if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     var userOpt = userRepository.findByEmail(email);
@@ -94,8 +80,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         return;
                     }
 
-                    if (log.isDebugEnabled()) log.debug("Action: User exists in DB. Proceeding with authentication.");
-
                     var authorities = new LinkedHashSet<SimpleGrantedAuthority>();
                     jwtUtil.extractAuthorities(token).stream()
                             .map(SimpleGrantedAuthority::new)
@@ -111,10 +95,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     // during Hibernate's flush lifecycle. See AuditingConfig.
                     authToken.setDetails(user.getId());
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-                    if (log.isDebugEnabled()) log.debug("Action: Successfully authenticated user in SecurityContext.");
                 }
-            } else {
-                if (log.isDebugEnabled()) log.debug("Token Status: INVALID (Validate method returned false)");
             }
         } catch (Exception e) {
             if (log.isErrorEnabled()) {

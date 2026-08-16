@@ -36,17 +36,14 @@ public class AsyncJobScheduler {
     @Scheduled(fixedDelayString = "${app.async-jobs.poll-interval-ms:60000}")
     public void pollAndProcessJobs() {
         if (!running.compareAndSet(false, true)) {
-            log.debug("Skipping async job poll because the previous poll is still running");
             return;
         }
         if (!databaseLockService.tryLock(DatabaseLockService.ASYNC_JOB_SCHEDULER)) {
-            log.debug("Skipping async job poll because another instance owns the database scheduler lock");
             running.set(false);
             return;
         }
 
         try {
-            log.debug("Polling for executable async retry jobs...");
             recoverInterruptedJobs();
 
             List<AsyncJob> jobs = asyncJobRepository.findExecutableJobs(
