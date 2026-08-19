@@ -5,7 +5,6 @@ import com.mybill.MyBill_Backend.dto.sync.payload.*;
 import com.mybill.MyBill_Backend.entity.*;
 import com.mybill.MyBill_Backend.repository.*;
 import com.mybill.MyBill_Backend.util.SecurityUtils;
-import com.mybill.MyBill_Backend.exception.NotFoundException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -658,7 +657,10 @@ public class SyncService {
         }
 
         Client client = clientRepository.findByIdAndUserId(clientId, userId)
-                .orElseThrow(() -> new NotFoundException("Client not found for work"));
+                .orElse(null);
+        if (client == null) {
+            return null;
+        }
 
         ClientWork work = workRepository.findByIdAndUserId(id, userId)
                 .orElseGet(ClientWork::new);
@@ -891,7 +893,10 @@ public class SyncService {
         requirePositive(payload.getQuantity(), "Invoice item quantity must be positive");
 
         Invoice invoice = invoiceRepository.findByIdAndUserId(invoiceId, userId)
-                .orElseThrow(() -> new RuntimeException("Invoice not found for invoice item"));
+                .orElse(null);
+        if (invoice == null) {
+            return null;
+        }
 
         ClientWork work = workId != null ? workRepository.findByIdAndUserId(workId, userId).orElse(null) : null;
 
@@ -955,7 +960,10 @@ public class SyncService {
 
         UUID clientId = requireUuid(payload.getClientId(), "Client id missing for ledger entry");
         Client client = clientRepository.findByIdAndUserId(clientId, userId)
-                .orElseThrow(() -> new RuntimeException("Client not found for ledger entry"));
+                .orElse(null);
+        if (client == null) {
+            return null;
+        }
 
         ClientLedgerEntry entry = ledgerEntryRepository.findByIdAndUserId(id, userId)
                 .orElseGet(ClientLedgerEntry::new);

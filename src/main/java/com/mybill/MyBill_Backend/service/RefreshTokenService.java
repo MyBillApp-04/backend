@@ -17,6 +17,8 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -26,8 +28,10 @@ public class RefreshTokenService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtUtil jwtUtil;
 
-    @Value("${app.security.jwt.refresh-expiration:2592000000}")
+    @Value("${app.security.jwt.refresh-expiration:7776000000}")
     private long refreshExpirationMillis;
+
+    private final ConcurrentHashMap<String, CompletableFuture<TokenPair>> inFlightRefreshes = new ConcurrentHashMap<>();
 
     @Transactional
     public TokenPair issue(User user) {
@@ -52,6 +56,42 @@ public class RefreshTokenService {
 
     @Transactional
     public TokenPair rotate(String rawToken) {
+        String userKey = getUserKeyFromToken(rawToken);
+        if (userKey == null) {
+            throw new InvalidRefreshTokenException();
+        }
+
+        CompletableFuture<TokenPair> future = new CompletableFuture<>();
+        CompletableFuture<TokenPair> existing = inFlightRefreshes.putIfAbsent(userKey, future);
+        if (existing != null) {
+            return existing.join();
+        }
+
+        try {
+            TokenPair result = doRotate(rawToken);
+            future.complete(result);
+            return result;
+        } catch (Exception e) {
+            future.completeExceptionally(e);
+            throw e;
+        } finally {
+            inFlightRefreshes.remove(userKey, future);
+        }
+    }
+
+    private String getUserKeyFromToken(String rawToken) {
+        try {
+            String tokenHash = hash(rawToken);
+            return refreshTokenRepository.findByTokenHash(tokenHash)
+                    .map(rt -> rt.getUser().getId().toString())
+                    .orElse(null);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    @Transactional
+    TokenPair doRotate(String rawToken) {
         String tokenHash = hash(rawToken);
         RefreshToken stored = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new InvalidRefreshTokenException());
@@ -67,6 +107,8 @@ public class RefreshTokenService {
         }
 
         stored.setRevokedAt(Instant.now());
+        // SLIDING WINDOW: extend expiry on each successful rotation
+        stored.setExpiresAt(Instant.now().plusMillis(refreshExpirationMillis));
         refreshTokenRepository.save(stored);
         // Preserve device tracking on rotation
         return issue(stored.getUser(), stored.getDeviceId(), stored.getDeviceName());

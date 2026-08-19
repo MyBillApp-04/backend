@@ -131,15 +131,24 @@ public class AuthController {
         if (token != null && jwtUtil.validateToken(token)) {
             tokenDenylist.deny(token, jwtUtil.extractExpiration(token));
         }
-        // Revoke the presented refresh token (if supplied) and, for the authenticated
-        // user, all other active refresh tokens so the session cannot be resumed.
+        // Revoke only the presented refresh token (current device)
         refreshTokenService.revoke(request.getHeader("X-Refresh-Token"));
+        return ResponseEntity.ok(Map.of("message", "Logged out"));
+    }
+
+    @DeleteMapping("/logout-everywhere")
+    public ResponseEntity<?> logoutEverywhere(HttpServletRequest request) {
+        String token = bearerToken(request);
+        if (token != null && jwtUtil.validateToken(token)) {
+            tokenDenylist.deny(token, jwtUtil.extractExpiration(token));
+        }
+        // Revoke all refresh tokens for this user (all devices)
         try {
             refreshTokenService.revokeAllForUser(securityUtils.getCurrentUserId());
         } catch (RuntimeException ignored) {
-            // No authenticated principal (e.g. already-invalid access token); nothing to revoke.
+            // No authenticated principal
         }
-        return ResponseEntity.ok(Map.of("message", "Logged out"));
+        return ResponseEntity.ok(Map.of("message", "Logged out from all devices"));
     }
 
     private String bearerToken(HttpServletRequest request) {

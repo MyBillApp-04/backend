@@ -40,10 +40,12 @@ class RefreshTokenServiceTest {
     @Test
     void rotatesAnActiveRefreshToken() {
         User user = User.builder().email("owner@example.com").role(Role.OWNER).build();
+        user.setId(1L);
         RefreshToken existing = new RefreshToken();
         existing.setUser(user);
         existing.setExpiresAt(Instant.now().plusSeconds(60));
-        when(repository.findByTokenHash(any())).thenReturn(Optional.of(existing));
+        // Called twice: once in getUserKeyFromToken, once in doRotate
+        when(repository.findByTokenHash(anyString())).thenReturn(Optional.of(existing));
         when(jwtUtil.generateToken(user.getEmail(), user.getRole())).thenReturn("access-token");
         ReflectionTestUtils.setField(service, "refreshExpirationMillis", 60_000L);
 
@@ -67,11 +69,13 @@ class RefreshTokenServiceTest {
     @Test
     void detectsTokenReuseAndRevokesAllTokens() {
         User user = User.builder().email("owner@example.com").role(Role.OWNER).build();
+        user.setId(1L);
         RefreshToken existing = new RefreshToken();
         existing.setUser(user);
         existing.setExpiresAt(Instant.now().plusSeconds(60));
         existing.setRevokedAt(Instant.now().minusSeconds(5));
-        when(repository.findByTokenHash(any())).thenReturn(Optional.of(existing));
+        // Called twice: once in getUserKeyFromToken, once in doRotate
+        when(repository.findByTokenHash(anyString())).thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> service.rotate("reused_refresh_token"))
                 .isInstanceOf(RefreshTokenService.InvalidRefreshTokenException.class);
