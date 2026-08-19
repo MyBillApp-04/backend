@@ -888,7 +888,7 @@ public class SyncService {
         InvoiceItemSyncPayload payload = toPayload(change, InvoiceItemSyncPayload.class);
 
         UUID invoiceId = requireUuid(payload.getInvoiceId(), "Invoice item invoice id missing");
-        UUID workId = payload.getWorkId() != null && !payload.getWorkId().isBlank() ? requireUuid(payload.getWorkId(), "Invalid work id") : null;
+        UUID workId = parseWorkId(payload.getWorkId());
         requirePositive(payload.getRate(), "Invoice item rate must be positive");
         requirePositive(payload.getQuantity(), "Invoice item quantity must be positive");
 
@@ -1090,6 +1090,17 @@ public class SyncService {
             return UUID.fromString(value);
         } catch (IllegalArgumentException e) {
             throw new RuntimeException(message + ": must be a UUID string");
+        }
+    }
+
+    private UUID parseWorkId(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException e) {
+            return null;
         }
     }
 
