@@ -727,7 +727,10 @@ public class SyncService {
         UUID clientId = requireUuid(payload.getClientId(), "Client id missing for invoice");
 
         Client client = clientRepository.findByIdAndUserId(clientId, userId)
-                .orElseThrow(() -> new RuntimeException("Client not found for invoice"));
+                .orElse(null);
+        if (client == null) {
+            return null;
+        }
 
         Optional<Invoice> existingInvoice = invoiceRepository.findByIdAndUserId(id, userId);
         Invoice invoice = existingInvoice.orElseGet(Invoice::new);
@@ -1273,7 +1276,10 @@ public class SyncService {
         UUID clientId = requireUuid(payload.getClientId(), "Client id missing for quotation");
 
         Client client = clientRepository.findByIdAndUserId(clientId, userId)
-                .orElseThrow(() -> new RuntimeException("Client not found for quotation"));
+                .orElse(null);
+        if (client == null) {
+            return null;
+        }
 
         Optional<Quotation> existingQuotation = quotationRepository.findByIdAndUserId(id, userId);
         Quotation quotation = existingQuotation.orElseGet(Quotation::new);
@@ -1371,7 +1377,7 @@ public class SyncService {
         QuotationItemSyncPayload payload = toPayload(change, QuotationItemSyncPayload.class);
 
         UUID quotationId = requireUuid(payload.getQuotationId(), "Quotation item parent id missing");
-        requirePositive(payload.getAmount(), "Quotation item amount must be non-negative");
+        requirePositive(payload.getAmount(), "Quotation item amount must be positive");
         requirePositive(payload.getQuantity(), "Quotation item quantity must be positive");
 
         Quotation quotation = quotationRepository.findByIdAndUserId(quotationId, userId)
@@ -1417,8 +1423,8 @@ public class SyncService {
         UUID id = requireEntityId(change, "Catalog item id missing");
         CatalogItemSyncPayload payload = toPayload(change, CatalogItemSyncPayload.class);
 
-        requirePositive(payload.getDefaultRate(), "Catalog item default rate must be non-negative");
-        requirePositive(payload.getDefaultTaxRate(), "Catalog item default tax rate must be non-negative");
+        requirePositive(payload.getDefaultRate(), "Catalog item default rate must be positive");
+        requirePositive(payload.getDefaultTaxRate(), "Catalog item default tax rate must be positive");
 
         CatalogItem item = catalogItemRepository.findByIdAndUserId(id, userId)
                 .orElseGet(CatalogItem::new);
