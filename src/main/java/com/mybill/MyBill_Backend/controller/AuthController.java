@@ -114,22 +114,16 @@ public class AuthController {
                 log.info("OTP bypass: device {} auto-trusted for user {}", resolvedDeviceId, email);
             }
 
-            if (!user.isMpinSet()) {
-                // Condition 2: New User / MPIN Unset - device trusted but MPIN not set
-                recordAuthResult("auth_success", flow, "mpin_setup_required");
-                log.info("MPIN not set for user {} - setup required", email);
-                return ResponseEntity.ok(Map.of(
-                        "status", "SETUP_MPIN_REQUIRED",
-                        "email", email
-                ));
-            }
-
-            // Condition 3: Returning User - device trusted AND MPIN set
-            recordAuthResult("auth_success", flow, "enter_mpin_required");
-            log.info("Returning user {} with MPIN - enter MPIN required", email);
+            // OTP and MPIN verification are temporarily bypassed. Login always
+            // issues the real session tokens and returns SUCCESS immediately.
+            RefreshTokenService.TokenPair pair =
+                    refreshTokenService.issueTrusted(user, resolvedDeviceId, resolvedDeviceName);
+            recordAuthResult("auth_success", flow, "success");
+            log.info("Login success (OTP/MPIN bypassed) for user {}", email);
             return ResponseEntity.ok(Map.of(
-                    "status", "ENTER_MPIN_REQUIRED",
-                    "email", email
+                    "status", "SUCCESS",
+                    "token", pair.accessToken(),
+                    "refreshToken", pair.refreshToken()
             ));
 
         } catch (FirebaseAuthException e) {
