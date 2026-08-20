@@ -108,23 +108,10 @@ public class AuthController {
                             user.getId(), resolvedDeviceId);
 
             if (existingTokenOpt.isEmpty()) {
-                // Condition 1: Unrecognized Device - no matching record or isTrusted == false
-                try {
-                    otpService.sendDeviceVerificationOtp(email, resolvedDeviceName);
-                } catch (Exception e) {
-                    // A mail delivery failure must not block the login flow. The
-                    // OTP is still stored in memory, so the user can retry from the
-                    // device-verification screen once email delivery recovers.
-                    log.warn("Failed to send device verification OTP for {}: exception={} message={}",
-                            email, e.getClass().getSimpleName(),
-                            SecureLogMessageConverter.sanitize(e.getMessage()));
-                }
-                recordAuthResult("auth_success", flow, "device_verification_required");
-                log.info("Unrecognized device for user {} - OTP required", email);
-                return ResponseEntity.ok(Map.of(
-                        "status", "DEVICE_VERIFICATION_REQUIRED",
-                        "email", email
-                ));
+                // OTP device verification is temporarily disabled. Any device is
+                // auto-trusted so login proceeds straight to the MPIN step.
+                refreshTokenService.trustDevice(user, resolvedDeviceId, resolvedDeviceName);
+                log.info("OTP bypass: device {} auto-trusted for user {}", resolvedDeviceId, email);
             }
 
             if (!user.isMpinSet()) {
