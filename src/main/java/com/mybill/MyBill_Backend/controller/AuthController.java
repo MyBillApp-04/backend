@@ -97,15 +97,28 @@ public class AuthController {
 
             User user = authService.firebaseLoginUser(email, name, provider, Role.OWNER);
 
-            // Check RefreshToken for (userId, deviceId) to determine auth state
+            // Check RefreshToken for (userId, deviceId) to determine auth state.
+            // Token rotation creates multiple rows per device, so always pick the
+            // most recent trusted one instead of querying for a single unique row.
             String resolvedDeviceId = deviceId != null ? deviceId : "unknown";
             String resolvedDeviceName = deviceName != null ? deviceName : "unknown";
 
-            Optional<RefreshToken> existingTokenOpt = refreshTokenRepository.findByUserIdAndDeviceId(user.getId(), resolvedDeviceId);
+            Optional<RefreshToken> existingTokenOpt =
+                    refreshTokenRepository.findFirstByUserIdAndDeviceIdAndTrustedTrueOrderByCreatedAtDesc(
+                            user.getId(), resolvedDeviceId);
 
-            if (existingTokenOpt.isEmpty() || !existingTokenOpt.get().isTrusted()) {
+            if (existingTokenOpt.isEmpty()) {
                 // Condition 1: Unrecognized Device - no matching record or isTrusted == false
-                otpService.sendDeviceVerificationOtp(email, resolvedDeviceName);
+                try {
+                    otpService.sendDeviceVerificationOtp(email, resolvedDeviceName);
+                } catch (Exception e) {
+                    // A mail delivery failure must not block the login flow. The
+                    // OTP is still stored in memory, so the user can retry from the
+                    // device-verification screen once email delivery recovers.
+                    log.warn("Failed to send device verification OTP for {}: exception={} message={}",
+                            email, e.getClass().getSimpleName(),
+                            SecureLogMessageConverter.sanitize(e.getMessage()));
+                }
                 recordAuthResult("auth_success", flow, "device_verification_required");
                 log.info("Unrecognized device for user {} - OTP required", email);
                 return ResponseEntity.ok(Map.of(

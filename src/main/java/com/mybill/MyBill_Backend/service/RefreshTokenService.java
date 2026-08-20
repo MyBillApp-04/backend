@@ -91,7 +91,7 @@ public class RefreshTokenService {
     }
 
     private RefreshToken findOrCreateDeviceToken(User user, String deviceId, String deviceName) {
-        return refreshTokenRepository.findByUserIdAndDeviceId(user.getId(), deviceId)
+        return refreshTokenRepository.findFirstByUserIdAndDeviceIdOrderByCreatedAtDesc(user.getId(), deviceId)
                 .orElseGet(() -> {
                     RefreshToken token = new RefreshToken();
                     token.setUser(user);

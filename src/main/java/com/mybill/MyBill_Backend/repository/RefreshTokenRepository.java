@@ -25,4 +25,8 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
     void revokeAllByUserId(@Param("userId") Long userId, @Param("revokedAt") Instant revokedAt);
 
     Optional<RefreshToken> findByUserIdAndDeviceId(Long userId, String deviceId);
+
+    Optional<RefreshToken> findFirstByUserIdAndDeviceIdOrderByCreatedAtDesc(Long userId, String deviceId);
+
+    Optional<RefreshToken> findFirstByUserIdAndDeviceIdAndTrustedTrueOrderByCreatedAtDesc(Long userId, String deviceId);
 }
