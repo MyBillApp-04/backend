@@ -1125,6 +1125,12 @@ public class SyncService {
         }
     }
 
+    private void requireNonNegative(Double value, String message) {
+        if (value == null || value < 0) {
+            throw new RuntimeException(message);
+        }
+    }
+
     private boolean hasServerConflict(LocalDateTime serverUpdatedAt, LocalDateTime clientChangedAt, String conflictPolicy) {
         if ("CLIENT_WINS".equalsIgnoreCase(conflictPolicy)) {
             return false;
@@ -1423,8 +1429,8 @@ public class SyncService {
         UUID id = requireEntityId(change, "Catalog item id missing");
         CatalogItemSyncPayload payload = toPayload(change, CatalogItemSyncPayload.class);
 
-        requirePositive(payload.getDefaultRate(), "Catalog item default rate must be positive");
-        requirePositive(payload.getDefaultTaxRate(), "Catalog item default tax rate must be positive");
+        requireNonNegative(payload.getDefaultRate(), "Catalog item default rate must be non-negative");
+        requireNonNegative(payload.getDefaultTaxRate(), "Catalog item default tax rate must be non-negative");
 
         CatalogItem item = catalogItemRepository.findByIdAndUserId(id, userId)
                 .orElseGet(CatalogItem::new);

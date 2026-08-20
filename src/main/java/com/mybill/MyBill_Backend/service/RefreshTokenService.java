@@ -54,6 +54,59 @@ public class RefreshTokenService {
         return new TokenPair(jwtUtil.generateToken(user.getEmail(), user.getRole()), rawToken);
     }
 
+    /**
+     * Marks the device as trusted (find-or-create the per-device token row) so a
+     * subsequent {@code /firebase-login} from this device skips OTP. No client-usable
+     * token is returned here; the row carries a placeholder hash until MPIN is verified.
+     */
+    @Transactional
+    public void trustDevice(User user, String deviceId, String deviceName) {
+        RefreshToken token = findOrCreateDeviceToken(user, deviceId, deviceName);
+        token.setTrusted(true);
+        token.setExpiresAt(Instant.now().plusMillis(refreshExpirationMillis));
+        refreshTokenRepository.save(token);
+    }
+
+    /**
+     * Reuses the single per-device token row, replaces its placeholder hash with a real
+     * refresh token, marks the device trusted, and returns a usable access/refresh pair.
+     * This is the terminal step of the MPIN flow that hands the app its real session.
+     */
+    @Transactional
+    public TokenPair issueTrusted(User user, String deviceId, String deviceName) {
+        RefreshToken token = findOrCreateDeviceToken(user, deviceId, deviceName);
+
+        byte[] bytes = new byte[48];
+        RANDOM.nextBytes(bytes);
+        String rawToken = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+
+        token.setTokenHash(hash(rawToken));
+        token.setTrusted(true);
+        token.setExpiresAt(Instant.now().plusMillis(refreshExpirationMillis));
+        token.setDeviceId(deviceId);
+        token.setDeviceName(deviceName);
+        refreshTokenRepository.save(token);
+
+        return new TokenPair(jwtUtil.generateToken(user.getEmail(), user.getRole()), rawToken);
+    }
+
+    private RefreshToken findOrCreateDeviceToken(User user, String deviceId, String deviceName) {
+        return refreshTokenRepository.findByUserIdAndDeviceId(user.getId(), deviceId)
+                .orElseGet(() -> {
+                    RefreshToken token = new RefreshToken();
+                    token.setUser(user);
+                    token.setDeviceId(deviceId);
+                    token.setDeviceName(deviceName);
+                    token.setCreatedAt(Instant.now());
+                    token.setExpiresAt(Instant.now().plusMillis(refreshExpirationMillis));
+                    byte[] bytes = new byte[48];
+                    RANDOM.nextBytes(bytes);
+                    token.setTokenHash(hash(Base64.getUrlEncoder().withoutPadding()
+                            .encodeToString(bytes)));
+                    return token;
+                });
+    }
+
     @Transactional
     public TokenPair rotate(String rawToken) {
         String userKey = getUserKeyFromToken(rawToken);

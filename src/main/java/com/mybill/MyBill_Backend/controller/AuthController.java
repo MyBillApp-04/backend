@@ -1,28 +1,39 @@
 package com.mybill.MyBill_Backend.controller;
 
+import com.mybill.MyBill_Backend.dto.FirebaseLoginRequest;
+import com.mybill.MyBill_Backend.dto.RefreshTokenRequest;
 import com.mybill.MyBill_Backend.entity.AuthProvider;
 import com.mybill.MyBill_Backend.entity.Role;
 import com.mybill.MyBill_Backend.entity.User;
-import com.mybill.MyBill_Backend.dto.FirebaseLoginRequest;
-import com.mybill.MyBill_Backend.dto.RefreshTokenRequest;
+import com.mybill.MyBill_Backend.entity.RefreshToken;
 import com.mybill.MyBill_Backend.observability.SecureLogMessageConverter;
 import com.mybill.MyBill_Backend.security.JwtTokenDenylist;
 import com.mybill.MyBill_Backend.security.JwtUtil;
 import com.mybill.MyBill_Backend.service.AuthService;
+import com.mybill.MyBill_Backend.service.OtpService;
 import com.mybill.MyBill_Backend.service.RefreshTokenService;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
 import jakarta.servlet.http.HttpServletRequest;
 import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import jakarta.validation.Valid;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Date;
 import java.util.Map;
+import java.util.Optional;
+
+import com.mybill.MyBill_Backend.repository.RefreshTokenRepository;
+import com.mybill.MyBill_Backend.repository.UserRepository;
+import com.mybill.MyBill_Backend.util.SecurityUtils;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -35,6 +46,9 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final JwtTokenDenylist tokenDenylist;
     private final RefreshTokenService refreshTokenService;
+    private final OtpService otpService;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final UserRepository userRepository;
     private final com.mybill.MyBill_Backend.util.SecurityUtils securityUtils;
 
     @PostMapping("/firebase-login")
@@ -82,11 +96,49 @@ public class AuthController {
             }
 
             User user = authService.firebaseLoginUser(email, name, provider, Role.OWNER);
-            RefreshTokenService.TokenPair tokens = refreshTokenService.issue(user, deviceId, deviceName);
-            recordAuthResult("auth_success", flow, "accepted");
-            log.info("Successful login via {}", provider);
-            return ResponseEntity.ok(Map.of("token", tokens.accessToken(), "refreshToken", tokens.refreshToken()));
 
+            // Check RefreshToken for (userId, deviceId) to determine auth state
+            String resolvedDeviceId = deviceId != null ? deviceId : "unknown";
+            String resolvedDeviceName = deviceName != null ? deviceName : "unknown";
+
+            Optional<RefreshToken> existingTokenOpt = refreshTokenRepository.findByUserIdAndDeviceId(user.getId(), resolvedDeviceId);
+
+            if (existingTokenOpt.isEmpty() || !existingTokenOpt.get().isTrusted()) {
+                // Condition 1: Unrecognized Device - no matching record or isTrusted == false
+                otpService.sendDeviceVerificationOtp(email, resolvedDeviceName);
+                recordAuthResult("auth_success", flow, "device_verification_required");
+                log.info("Unrecognized device for user {} - OTP required", email);
+                return ResponseEntity.ok(Map.of(
+                        "status", "DEVICE_VERIFICATION_REQUIRED",
+                        "email", email
+                ));
+            }
+
+            if (!user.isMpinSet()) {
+                // Condition 2: New User / MPIN Unset - device trusted but MPIN not set
+                recordAuthResult("auth_success", flow, "mpin_setup_required");
+                log.info("MPIN not set for user {} - setup required", email);
+                return ResponseEntity.ok(Map.of(
+                        "status", "SETUP_MPIN_REQUIRED",
+                        "email", email
+                ));
+            }
+
+            // Condition 3: Returning User - device trusted AND MPIN set
+            recordAuthResult("auth_success", flow, "enter_mpin_required");
+            log.info("Returning user {} with MPIN - enter MPIN required", email);
+            return ResponseEntity.ok(Map.of(
+                    "status", "ENTER_MPIN_REQUIRED",
+                    "email", email
+            ));
+
+        } catch (FirebaseAuthException e) {
+            // Specific handling for Firebase token verification failure
+            recordAuthResult("auth_failure", flow, "firebase_token_verification_failed");
+            log.error("Firebase token verification failed: exception={} message={}",
+                    e.getClass().getSimpleName(), SecureLogMessageConverter.sanitize(e.getMessage()));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Firebase token verification failed. Please check Firebase configuration and try again."));
         } catch (Exception e) {
             recordAuthResult("auth_failure", flow, "server_error");
             log.error("Firebase login failed: exception={} message={}",
@@ -103,6 +155,162 @@ public class AuthController {
         }
     }
 
+    @PostMapping("/verify-device-otp")
+    public ResponseEntity<?> verifyDeviceOtp(@RequestBody Map<String, String> payload,
+                                            @RequestHeader(name = "X-Device-Id") String deviceId) {
+        String email = payload.get("email");
+        String inputOtp = payload.get("otp");
+
+        if (email == null || inputOtp == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Email and OTP are required"));
+        }
+
+        boolean valid = otpService.verifyOtp(email, inputOtp);
+
+        if (!valid) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired OTP"));
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElse(null);
+
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "No account found with this email"));
+        }
+
+        // OTP verified → trust this device so subsequent logins skip OTP.
+        refreshTokenService.trustDevice(user, deviceId, "unknown");
+
+        String status = user.isMpinSet() ? "ENTER_MPIN_REQUIRED" : "SETUP_MPIN_REQUIRED";
+        log.info("Device {} trusted for user {} - next step {}", deviceId, email, status);
+
+        return ResponseEntity.ok(Map.of(
+                "status", status,
+                "email", email
+        ));
+    }
+
+    @PostMapping("/setup-mpin")
+    public ResponseEntity<?> setupMpin(@RequestBody Map<String, String> payload,
+                                       @RequestHeader(name = "X-Device-Id") String deviceId) {
+        String email = payload.get("email");
+        String mpin = payload.get("mpin");
+
+        if (email == null || mpin == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Email and 4-digit MPIN are required"));
+        }
+
+        if (!mpin.matches("\\d{4}")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "MPIN must be exactly 4 digits"));
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElse(null);
+
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "No account found with this email"));
+        }
+
+        user.setMpinHash(BCrypt.hashpw(mpin, BCrypt.gensalt()));
+        user.setMpinSet(true);
+        user.setMpinAttempts(0);
+        userRepository.save(user);
+
+        log.info("MPIN set for user {}", email);
+
+        return ResponseEntity.ok(Map.of(
+                "status", "ENTER_MPIN_REQUIRED",
+                "email", email
+        ));
+    }
+
+    @PostMapping("/verify-mpin")
+    public ResponseEntity<?> verifyMpin(@RequestBody Map<String, String> payload,
+                                        @RequestHeader(name = "X-Device-Id") String deviceId,
+                                        @RequestHeader(name = "X-Device-Name") String deviceName) {
+        String email = payload.get("email");
+        String inputMpin = payload.get("mpin");
+
+        if (email == null || inputMpin == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Email and MPIN are required"));
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElse(null);
+
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "No account found with this email"));
+        }
+
+        if (!user.isMpinSet() || user.getMpinHash() == null || user.getMpinHash().isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "MPIN has not been set for this account"));
+        }
+
+        if (!BCrypt.checkpw(inputMpin, user.getMpinHash())) {
+            int attempts = user.getMpinAttempts() + 1;
+            user.setMpinAttempts(attempts);
+            userRepository.save(user);
+
+            int remaining = Math.max(0, 5 - attempts);
+            log.warn("Invalid MPIN for user {} - attempt {}/5", email, attempts);
+
+            if (remaining <= 0) {
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                        .body(Map.of("error", "Too many incorrect attempts. Please sign in again."));
+            }
+
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Incorrect MPIN. " + remaining + " attempt(s) remaining."));
+        }
+
+        // Success: reset attempt counter and issue the real session tokens.
+        user.setMpinAttempts(0);
+        userRepository.save(user);
+
+        String resolvedDeviceName = deviceName != null && !deviceName.isBlank() ? deviceName : "unknown";
+        RefreshTokenService.TokenPair pair =
+                refreshTokenService.issueTrusted(user, deviceId, resolvedDeviceName);
+
+        log.info("MPIN verified for user {}", email);
+
+        return ResponseEntity.ok(Map.of(
+                "status", "SUCCESS",
+                "token", pair.accessToken(),
+                "refreshToken", pair.refreshToken()
+        ));
+    }
+
+    @DeleteMapping("/logout")
+    public ResponseEntity<?> logout(
+            HttpServletRequest request,
+            @RequestHeader(name = "X-Refresh-Token", required = false) String rawRefreshToken) {
+        String bearer = request.getHeader("Authorization");
+
+        // Denylist the current access token so it can no longer be used.
+        if (bearer != null && bearer.startsWith("Bearer ")) {
+            String token = bearer.substring(7);
+            try {
+                Date expiresAt = jwtUtil.extractExpiration(token);
+                tokenDenylist.deny(token, expiresAt);
+            } catch (Exception e) {
+                log.info("Logout: could not parse/deny access token: message={}",
+                        SecureLogMessageConverter.sanitize(e.getMessage()));
+            }
+        }
+
+        // Revoke the presented refresh token, terminating the session on this device.
+        if (rawRefreshToken != null && !rawRefreshToken.isBlank()) {
+            refreshTokenService.revoke(rawRefreshToken);
+        }
+
+        recordAuthResult("auth_logout", "logout", "success");
+        return ResponseEntity.noContent().build();
+    }
+
     private void recordAuthResult(String metric, String flow, String outcome) {
         meterRegistry.counter(metric, "flow", flow, "outcome", outcome).increment();
     }
@@ -110,58 +318,6 @@ public class AuthController {
     protected FirebaseToken verifyIdToken(String idToken) throws Exception {
         // Authentication must always be verified by Firebase Admin. In particular, never
         // trust claims decoded from an unsigned/unverified client token in local or prod.
-        return FirebaseAuth.getInstance().verifyIdToken(idToken, true);
-    }
-
-    @PostMapping("/refresh")
-    public ResponseEntity<?> refresh(@Valid @RequestBody RefreshTokenRequest request) {
-        try {
-            RefreshTokenService.TokenPair tokens = refreshTokenService.rotate(request.refreshToken());
-            recordAuthResult("auth_success", "refresh", "accepted");
-            return ResponseEntity.ok(Map.of("token", tokens.accessToken(), "refreshToken", tokens.refreshToken()));
-        } catch (RefreshTokenService.InvalidRefreshTokenException ex) {
-            recordAuthResult("auth_failure", "refresh", "invalid_token");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired refresh token"));
-        }
-    }
-
-    @DeleteMapping("/logout")
-    public ResponseEntity<?> logout(HttpServletRequest request) {
-        String token = bearerToken(request);
-        if (token != null && jwtUtil.validateToken(token)) {
-            tokenDenylist.deny(token, jwtUtil.extractExpiration(token));
-        }
-        // Revoke only the presented refresh token (current device)
-        refreshTokenService.revoke(request.getHeader("X-Refresh-Token"));
-        return ResponseEntity.ok(Map.of("message", "Logged out"));
-    }
-
-    @DeleteMapping("/logout-everywhere")
-    public ResponseEntity<?> logoutEverywhere(HttpServletRequest request) {
-        String token = bearerToken(request);
-        if (token != null && jwtUtil.validateToken(token)) {
-            tokenDenylist.deny(token, jwtUtil.extractExpiration(token));
-        }
-        // Revoke all refresh tokens for this user (all devices)
-        try {
-            refreshTokenService.revokeAllForUser(securityUtils.getCurrentUserId());
-        } catch (RuntimeException ignored) {
-            // No authenticated principal
-        }
-        return ResponseEntity.ok(Map.of("message", "Logged out from all devices"));
-    }
-
-    private String bearerToken(HttpServletRequest request) {
-        String header = request.getHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ")) {
-            return null;
-        }
-        return header.substring(7);
-    }
-
-    // Health check
-    @GetMapping("/ping")
-    public ResponseEntity<String> ping() {
-        return ResponseEntity.ok("MyBill backend is running");
+        return FirebaseAuth.getInstance().verifyIdToken(idToken, false);
     }
 }

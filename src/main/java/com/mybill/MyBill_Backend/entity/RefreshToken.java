@@ -8,6 +8,8 @@ import lombok.Setter;
 import java.time.Instant;
 import java.util.UUID;
 
+import jakarta.persistence.Column;
+
 @Entity
 @Table(name = "refresh_tokens", schema = "public")
 @Getter
@@ -42,6 +44,9 @@ public class RefreshToken {
     @Column(name = "device_name", length = 255)
     private String deviceName;
 
+    @Column(name = "is_trusted", nullable = false, columnDefinition = "boolean default false")
+    private boolean trusted = false;
+
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
 
@@ -65,4 +70,6 @@ public class RefreshToken {
 
     public String getDeviceName() { return deviceName; }
     public void setDeviceName(String deviceName) { this.deviceName = deviceName; }
+    public boolean isTrusted() { return trusted; }
+    public void setTrusted(boolean trusted) { this.trusted = trusted; }
 }
